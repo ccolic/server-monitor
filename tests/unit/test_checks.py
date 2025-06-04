@@ -1,7 +1,7 @@
 """Tests for check implementations."""
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -12,7 +12,6 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
 from server_monitor.checks import (
-    BaseCheck,
     CheckStatus,
     HTTPCheck,
     TCPCheck,
@@ -26,7 +25,6 @@ from server_monitor.config import (
     TCPCheckConfig,
     TLSCheckConfig,
 )
-from server_monitor.database import CheckResult
 
 
 def test_create_check():
@@ -175,7 +173,7 @@ async def test_tcp_check_timeout():
 
     # Mock connection timeout
     with patch("asyncio.open_connection", return_value=(AsyncMock(), AsyncMock())):
-        with patch("asyncio.wait_for", side_effect=asyncio.TimeoutError()):
+        with patch("asyncio.wait_for", side_effect=TimeoutError()):
             result = await check.execute()
 
     assert result.status == CheckStatus.FAILURE
@@ -215,8 +213,8 @@ async def test_tls_check_success():
         .issuer_name(issuer)
         .public_key(private_key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.now(timezone.utc) - timedelta(days=1))
-        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=90))
+        .not_valid_before(datetime.now(UTC) - timedelta(days=1))
+        .not_valid_after(datetime.now(UTC) + timedelta(days=90))
         .sign(private_key, hashes.SHA256(), default_backend())
     )
 
@@ -231,7 +229,7 @@ async def test_tls_check_success():
 
     with patch("asyncio.open_connection", return_value=(mock_reader, mock_writer)):
         with patch("asyncio.wait_for", return_value=(mock_reader, mock_writer)):
-            with patch("x509.load_der_x509_certificate", return_value=cert):
+            with patch("cryptography.x509.load_der_x509_certificate", return_value=cert):
                 result = await check.execute()
 
     assert result.status == CheckStatus.SUCCESS
