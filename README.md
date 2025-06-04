@@ -63,7 +63,7 @@ global:
   log_level: INFO
   log_file: server-monitor.log
   max_concurrent_checks: 10
-  
+
   # Email notification settings
   email_notifications:
     enabled: true
@@ -79,11 +79,11 @@ global:
       # For STARTTLS (common ports: 587, 25):
       #   connection_method: starttls
       #   port: 587
-      # 
+      #
       # For Direct SSL/TLS (common ports: 465):
       #   connection_method: ssl
       #   port: 465
-      # 
+      #
       # For Plain/Unsecured (not recommended):
       #   connection_method: plain
       #   port: 25
@@ -91,7 +91,7 @@ global:
     recipients:
       - alerts@example.com
     subject_template: "Monitor Alert: {endpoint_name} - {status}"
-  
+
   # Webhook notification settings
   webhook_notifications:
     enabled: true
@@ -103,7 +103,7 @@ global:
       headers:
         Content-Type: application/json
       timeout: 30
-      
+
   # Database settings
   database:
     type: sqlite  # can be 'sqlite' or 'postgresql'
@@ -129,7 +129,7 @@ endpoints:
       expected_status: 200
       content_match: Example Domain
       follow_redirects: true
-  
+
   # More endpoints...
 ```
 

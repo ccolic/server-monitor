@@ -17,11 +17,11 @@ global:
       # For STARTTLS (common ports: 587, 25):
       #   connection_method: starttls
       #   port: 587
-      # 
+      #
       # For Direct SSL/TLS (common ports: 465):
       #   connection_method: ssl
       #   port: 465
-      # 
+      #
       # For Plain/Unsecured (not recommended):
       #   connection_method: plain
       #   port: 25
@@ -54,7 +54,7 @@ endpoints:
       expected_status: 200
       content_match: Example Domain
       follow_redirects: true
-  
+
   - name: Example API
     type: http
     interval: 30
@@ -66,7 +66,7 @@ endpoints:
         Authorization: Bearer your-token
       timeout: 5
       expected_status: 200
-  
+
   - name: Database Server
     type: tcp
     interval: 120
@@ -75,7 +75,7 @@ endpoints:
       host: db.example.com
       port: 5432
       timeout: 10
-  
+
   - name: HTTPS Certificate
     type: tls
     interval: 86400
