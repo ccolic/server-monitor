@@ -182,6 +182,9 @@ class DatabaseManager:
         VALUES ($1, $2, $3, $4, $5, $6, $7)
         """
 
+        # Convert dict to JSON string for storage
+        details_json = json.dumps(result.details) if result.details is not None else None
+
         async with self._pool.acquire() as conn:
             await conn.execute(
                 insert_sql,
@@ -190,7 +193,7 @@ class DatabaseManager:
                 result.status.value,
                 result.response_time,
                 result.error_message,
-                result.details,
+                details_json,
                 result.timestamp,
             )
 
@@ -204,6 +207,9 @@ class DatabaseManager:
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """
 
+        # Convert dict to JSON string for storage
+        details_json = json.dumps(result.details) if result.details is not None else None
+
         async with aiosqlite.connect(database_path) as conn:
             await conn.execute(
                 insert_sql,
@@ -213,7 +219,7 @@ class DatabaseManager:
                     result.status.value,
                     result.response_time,
                     result.error_message,
-                    result.details,
+                    details_json,
                     result.timestamp.isoformat(),
                 ),
             )
@@ -310,7 +316,7 @@ class DatabaseManager:
             )
             await conn.commit()
 
-    async def get_endpoint_status(self, endpoint_name: str) -> Optional[Dict[str, Any]]:
+    async def get_endpoint_status(self, endpoint_name: str) -> dict[str, Any] | None:
         """Get current status for an endpoint."""
         if self.config.type == DatabaseType.POSTGRESQL:
             return await self._get_postgresql_endpoint_status(endpoint_name)
@@ -320,7 +326,7 @@ class DatabaseManager:
 
     async def _get_postgresql_endpoint_status(
         self, endpoint_name: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Get endpoint status from PostgreSQL."""
         if not self._pool:
             raise RuntimeError("Database pool not initialized")
@@ -340,7 +346,7 @@ class DatabaseManager:
 
     async def _get_sqlite_endpoint_status(
         self, endpoint_name: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Get endpoint status from SQLite."""
         database_path = self.config.url.replace("sqlite:///", "")
 
