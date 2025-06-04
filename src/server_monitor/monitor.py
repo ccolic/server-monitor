@@ -37,7 +37,7 @@ class EndpointMonitor:
             endpoint_email_config=config.email_notifications,
             endpoint_webhook_config=config.webhook_notifications,
         )
-        self._task: asyncio.Task | None = None
+        self._task: asyncio.Task[Any] | None = None
         self._stop_event = asyncio.Event()
 
     async def start(self) -> None:
@@ -75,7 +75,7 @@ class EndpointMonitor:
                     previous_status = CheckStatus(
                         previous_status_data["current_status"]
                     )
-                    failure_count = previous_status_data.get("failure_count", 0)
+                    failure_count = int(previous_status_data.get("failure_count", 0))
 
                 # Store result in database
                 await self.db_manager.store_result(result)
@@ -160,9 +160,9 @@ class MonitorDaemon:
         self._setup_signal_handlers()
 
         # Start all endpoint monitors
-        start_tasks: list[asyncio.Task] = []
+        start_tasks: list[asyncio.Task[Any]] = []
         for monitor in self.endpoint_monitors.values():
-            start_tasks.append(monitor.start())
+            start_tasks.append(asyncio.create_task(monitor.start()))
 
         await asyncio.gather(*start_tasks)
 
@@ -178,9 +178,9 @@ class MonitorDaemon:
         logger.info("Stopping monitoring daemon...")
 
         # Stop all endpoint monitors with timeout
-        stop_tasks: list[asyncio.Task] = []
+        stop_tasks: list[asyncio.Task[Any]] = []
         for monitor in self.endpoint_monitors.values():
-            stop_tasks.append(monitor.stop())
+            stop_tasks.append(asyncio.create_task(monitor.stop()))
 
         try:
             # Implement a timeout for the cleanup tasks
@@ -202,7 +202,7 @@ class MonitorDaemon:
     def _setup_signal_handlers(self) -> None:
         """Set up signal handlers for graceful shutdown."""
 
-        def signal_handler(signum: int, frame) -> None:
+        def signal_handler(signum: int, frame: Any) -> None:
             self._interrupt_count += 1
 
             if self._interrupt_count == 1:
@@ -243,7 +243,7 @@ class MonitorDaemon:
 
     async def get_status(self) -> dict[str, Any]:
         """Get current status of all endpoints."""
-        status = {
+        status: dict[str, dict[str, Any]] = {
             "daemon": {
                 "running": not self._shutdown_event.is_set(),
                 "total_endpoints": len(self.config.endpoints),
@@ -271,11 +271,11 @@ class MonitorDaemon:
         logger.info("Reloading configuration...")
 
         # Stop all current monitors
-        stop_tasks: list[asyncio.Task] = []
+        reload_stop_tasks: list[asyncio.Task[Any]] = []
         for monitor in self.endpoint_monitors.values():
-            stop_tasks.append(monitor.stop())
+            reload_stop_tasks.append(asyncio.create_task(monitor.stop()))
 
-        await asyncio.gather(*stop_tasks, return_exceptions=True)
+        await asyncio.gather(*reload_stop_tasks, return_exceptions=True)
 
         # Clear current monitors
         self.endpoint_monitors.clear()
@@ -287,8 +287,8 @@ class MonitorDaemon:
         await self.initialize()
 
         # Start monitors with new configuration
-        start_tasks: list[asyncio.Task] = []
+        reload_start_tasks: list[asyncio.Task[Any]] = []
         for monitor in self.endpoint_monitors.values():
-            start_tasks.append(monitor.start())
+            reload_start_tasks.append(asyncio.create_task(monitor.start()))
 
-        await asyncio.gather(*start_tasks)
+        await asyncio.gather(*reload_start_tasks)

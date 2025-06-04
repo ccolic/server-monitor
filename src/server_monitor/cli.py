@@ -7,6 +7,9 @@ import asyncio
 import json
 import logging
 import sys
+from collections.abc import Callable, Mapping, MutableMapping
+from logging import Handler
+from typing import Any
 
 import click
 import structlog
@@ -18,35 +21,18 @@ from .config import load_config
 from .monitor import MonitorDaemon
 
 
-def configure_logging(log_level: str, log_file: str | None = None) -> None:
-    """Configure application logging."""
-    # Set up structlog
-    processors = [
-        structlog.contextvars.merge_contextvars,
-        structlog.processors.add_log_level,
-        structlog.processors.TimeStamper(fmt="iso"),
-    ]
-
+def setup_logging(log_level: str = "INFO", log_file: str | None = None) -> None:
+    """Set up logging configuration."""
+    # Create log handlers
+    log_handlers: list[Handler] = [logging.StreamHandler()]
     if log_file:
-        # Add file logging
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setFormatter(logging.Formatter("%(message)s"))
+        log_handlers.append(logging.FileHandler(log_file))
 
-        # Add console logging with colors
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(logging.Formatter("%(message)s"))
-
-        log_handlers = [file_handler, console_handler]
-        processors.extend(
-            [structlog.processors.format_exc_info, structlog.processors.JSONRenderer()]
-        )
-    else:
-        # Console only logging with pretty output
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(logging.Formatter("%(message)s"))
-        log_handlers = [console_handler]
-
-        processors.extend([structlog.dev.ConsoleRenderer(colors=True)])
+    processors: list[Callable[[Any, str, MutableMapping[str, Any]], Mapping[str, Any] | str | bytes | bytearray | tuple[Any, ...]]] = [
+        structlog.processors.add_log_level,
+        structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S"),
+        structlog.processors.JSONRenderer(),
+    ]
 
     # Configure standard logging
     logging.basicConfig(
@@ -81,7 +67,7 @@ def start(config_path: str) -> None:
         # Configure logging
         log_level = config.global_config.log_level
         log_file = config.global_config.log_file
-        configure_logging(log_level, log_file)
+        setup_logging(log_level, log_file)
 
         logger = structlog.get_logger("cli")
         logger.info("Starting server-monitor daemon", config_path=config_path)

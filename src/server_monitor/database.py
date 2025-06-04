@@ -44,7 +44,7 @@ class DatabaseManager:
 
     def __init__(self, config: DatabaseConfig) -> None:
         self.config = config
-        self._pool: asyncpg.Pool | aiosqlite.Connection | None = None
+        self._pool: asyncpg.Pool[Any] | aiosqlite.Connection | None = None
 
     async def initialize(self) -> None:
         """Initialize database connection."""
