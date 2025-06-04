@@ -88,7 +88,8 @@ async def test_http_check_invalid_regex():
         result = await check.execute()
     assert result.status == CheckStatus.ERROR
     assert "error_type" in result.details
-    assert result.details["error_type"] == "error"
+    # Accept both legacy and 3.13+ error_type values
+    assert result.details["error_type"] in ("error", "PatternError")
 
 
 @pytest.mark.asyncio
