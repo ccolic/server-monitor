@@ -12,7 +12,7 @@ from typing import Any
 import aiosqlite
 import asyncpg
 import structlog
-from pydantic import BaseModel, field_serializer
+from pydantic import BaseModel
 
 from .config import DatabaseConfig, DatabaseType
 
@@ -33,13 +33,14 @@ class CheckResult(BaseModel):
     endpoint_name: str
     check_type: str
     status: CheckStatus
-    response_time: Optional[float] = None
-    error_message: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
+    response_time: float | None = None
+    error_message: str | None = None
+    details: dict[str, Any] | None = None
     timestamp: datetime
-
-    class Config:
-        json_encoders = {datetime: lambda v: v.isoformat()}
+    
+    model_config = {
+        "json_encoders": {datetime: lambda v: v.isoformat()}
+    }
 
 
 class DatabaseManager:
