@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from abc import ABC, abstractmethod
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any
-import json
 
 import aiosmtplib
 import httpx
@@ -109,8 +109,12 @@ class EmailNotifier(BaseNotifier):
             async with aiosmtplib.SMTP(
                 hostname=self.smtp_config.host,
                 port=self.smtp_config.port,
-                use_tls=(self.smtp_config.connection_method == SMTPConnectionMethod.SSL),
-                start_tls=(self.smtp_config.connection_method == SMTPConnectionMethod.STARTTLS),
+                use_tls=(
+                    self.smtp_config.connection_method == SMTPConnectionMethod.SSL
+                ),
+                start_tls=(
+                    self.smtp_config.connection_method == SMTPConnectionMethod.STARTTLS
+                ),
             ) as smtp:
                 if self.smtp_config.username and self.smtp_config.password:
                     await smtp.login(

@@ -28,7 +28,12 @@ def setup_logging(log_level: str = "INFO", log_file: str | None = None) -> None:
     if log_file:
         log_handlers.append(logging.FileHandler(log_file))
 
-    processors: list[Callable[[Any, str, MutableMapping[str, Any]], Mapping[str, Any] | str | bytes | bytearray | tuple[Any, ...]]] = [
+    processors: list[
+        Callable[
+            [Any, str, MutableMapping[str, Any]],
+            Mapping[str, Any] | str | bytes | bytearray | tuple[Any, ...],
+        ]
+    ] = [
         structlog.processors.add_log_level,
         structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S"),
         structlog.processors.JSONRenderer(),

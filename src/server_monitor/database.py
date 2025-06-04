@@ -120,7 +120,11 @@ class DatabaseManager:
 
     async def _create_sqlite_tables(self) -> None:
         """Create SQLite tables."""
-        database_path = self.config.url.replace("sqlite:///", "") if self.config.url is not None else ""
+        database_path = (
+            self.config.url.replace("sqlite:///", "")
+            if self.config.url is not None
+            else ""
+        )
 
         create_table_sql = """
         CREATE TABLE IF NOT EXISTS check_results (
@@ -200,7 +204,11 @@ class DatabaseManager:
 
     async def _store_sqlite_result(self, result: CheckResult) -> None:
         """Store result in SQLite."""
-        database_path = self.config.url.replace("sqlite:///", "") if self.config.url is not None else ""
+        database_path = (
+            self.config.url.replace("sqlite:///", "")
+            if self.config.url is not None
+            else ""
+        )
 
         insert_sql = """
         INSERT INTO check_results (endpoint_name, check_type, status, response_time,
@@ -248,8 +256,12 @@ class DatabaseManager:
             failure_count = EXCLUDED.failure_count,
             updated_at = EXCLUDED.updated_at
         """
-        last_success = result.timestamp if result.status == CheckStatus.SUCCESS else None
-        last_failure = result.timestamp if result.status != CheckStatus.SUCCESS else None
+        last_success = (
+            result.timestamp if result.status == CheckStatus.SUCCESS else None
+        )
+        last_failure = (
+            result.timestamp if result.status != CheckStatus.SUCCESS else None
+        )
         failure_count = 0 if result.status == CheckStatus.SUCCESS else 1
         if self.config.type == DatabaseType.POSTGRESQL:
             async with self._pool.acquire() as conn:  # type: ignore
@@ -268,7 +280,11 @@ class DatabaseManager:
 
     async def _update_sqlite_endpoint_status(self, result: CheckResult) -> None:
         """Update endpoint status in SQLite."""
-        database_path = self.config.url.replace("sqlite:///", "") if self.config.url is not None else ""
+        database_path = (
+            self.config.url.replace("sqlite:///", "")
+            if self.config.url is not None
+            else ""
+        )
 
         # SQLite doesn't have native UPSERT like PostgreSQL, so we'll use INSERT OR REPLACE
         upsert_sql = """
@@ -315,7 +331,9 @@ class DatabaseManager:
             return await self._get_sqlite_endpoint_status(endpoint_name)
         return None
 
-    async def _get_postgresql_endpoint_status(self, endpoint_name: str) -> dict[str, Any] | None:
+    async def _get_postgresql_endpoint_status(
+        self, endpoint_name: str
+    ) -> dict[str, Any] | None:
         """Get endpoint status from PostgreSQL."""
         select_sql = """
         SELECT endpoint_name, current_status, last_success, last_failure,
@@ -337,7 +355,11 @@ class DatabaseManager:
         self, endpoint_name: str
     ) -> dict[str, Any] | None:
         """Get endpoint status from SQLite."""
-        database_path = self.config.url.replace("sqlite:///", "") if self.config.url is not None else ""
+        database_path = (
+            self.config.url.replace("sqlite:///", "")
+            if self.config.url is not None
+            else ""
+        )
 
         select_sql = """
         SELECT endpoint_name, current_status, last_success, last_failure,
