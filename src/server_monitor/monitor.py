@@ -5,7 +5,8 @@ from __future__ import annotations
 import asyncio
 import signal
 import sys
-from typing import Dict, List, Optional
+from concurrent.futures import TimeoutError
+from typing import Any, Optional
 
 import structlog
 
@@ -64,16 +65,12 @@ class EndpointMonitor:
                 result = await self.check.execute()
 
                 # Get previous status for notification context
-                previous_status_data = await self.db_manager.get_endpoint_status(
-                    self.config.name
-                )
+                previous_status_data = await self.db_manager.get_endpoint_status(self.config.name)
                 previous_status = None
                 failure_count = 0
 
                 if previous_status_data:
-                    previous_status = CheckStatus(
-                        previous_status_data["current_status"]
-                    )
+                    previous_status = CheckStatus(previous_status_data["current_status"])
                     failure_count = previous_status_data.get("failure_count", 0)
 
                 # Store result in database
@@ -96,19 +93,18 @@ class EndpointMonitor:
                 )
 
             except Exception as e:
-                logger.error(
-                    "Error in monitor loop", endpoint=self.config.name, error=str(e)
-                )
+                logger.error("Error in monitor loop", endpoint=self.config.name, error=str(e))
 
             # Wait for next check interval
             try:
-                await asyncio.wait_for(
-                    self._stop_event.wait(), timeout=self.config.interval
-                )
+                await asyncio.wait_for(self._stop_event.wait(), timeout=self.config.interval)
                 # If we reach here, stop event was set
                 break
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Timeout is expected, continue to next check
+                # Check again if stop event was set (helpful for fast shutdown)
+                if self._stop_event.is_set():
+                    break
                 continue
 
 
@@ -118,9 +114,12 @@ class MonitorDaemon:
     def __init__(self, config: MonitorConfig):
         self.config = config
         self.db_manager = DatabaseManager(config.global_config.database)
-        self.endpoint_monitors: Dict[str, EndpointMonitor] = {}
+        self.endpoint_monitors: dict[str, EndpointMonitor] = {}
         self._shutdown_event = asyncio.Event()
         self._semaphore = asyncio.Semaphore(config.global_config.max_concurrent_checks)
+        self._shutdown_in_progress = False
+        self._interrupt_count = 0
+        self._shutdown_timeout = 10.0  # seconds
 
     async def initialize(self) -> None:
         """Initialize the daemon."""
@@ -159,9 +158,7 @@ class MonitorDaemon:
 
         await asyncio.gather(*start_tasks)
 
-        logger.info(
-            "Monitoring daemon started", endpoints=list(self.endpoint_monitors.keys())
-        )
+        logger.info("Monitoring daemon started", endpoints=list(self.endpoint_monitors.keys()))
 
         # Wait for shutdown signal
         await self._shutdown_event.wait()
@@ -170,15 +167,22 @@ class MonitorDaemon:
         """Stop the monitoring daemon."""
         logger.info("Stopping monitoring daemon...")
 
-        # Stop all endpoint monitors
+        # Stop all endpoint monitors with timeout
         stop_tasks = []
         for monitor in self.endpoint_monitors.values():
             stop_tasks.append(monitor.stop())
 
-        await asyncio.gather(*stop_tasks, return_exceptions=True)
+        try:
+            # Implement a timeout for the cleanup tasks
+            await asyncio.wait_for(asyncio.gather(*stop_tasks, return_exceptions=True), timeout=self._shutdown_timeout)
+        except TimeoutError:
+            logger.warning(f"Clean shutdown timed out after {self._shutdown_timeout}s")
 
-        # Close database connections
-        await self.db_manager.close()
+        try:
+            # Close database connections with timeout
+            await asyncio.wait_for(self.db_manager.close(), timeout=2.0)
+        except TimeoutError:
+            logger.warning("Database close operation timed out")
 
         logger.info("Monitoring daemon stopped")
 
@@ -186,19 +190,43 @@ class MonitorDaemon:
         """Set up signal handlers for graceful shutdown."""
 
         def signal_handler(signum: int, frame) -> None:
-            logger.info(f"Received signal {signum}, initiating shutdown...")
-            asyncio.create_task(self._shutdown())
+            self._interrupt_count += 1
+
+            if self._interrupt_count == 1:
+                logger.info(f"Received signal {signum}, initiating graceful shutdown...")
+                asyncio.create_task(self._shutdown(graceful=True))
+            elif self._interrupt_count == 2:
+                logger.warning("Second interrupt received, expediting shutdown...")
+                asyncio.create_task(self._shutdown(graceful=False))
+            else:
+                logger.warning("Multiple interrupts received, forcing exit...")
+                # Force exit immediately on third Ctrl+C
+                sys.exit(130)  # 130 is the exit code for SIGINT
 
         # Only set up signal handlers on Unix systems
         if sys.platform != "win32":
             signal.signal(signal.SIGTERM, signal_handler)
             signal.signal(signal.SIGINT, signal_handler)
 
-    async def _shutdown(self) -> None:
-        """Initiate graceful shutdown."""
+    async def _shutdown(self, graceful: bool = True) -> None:
+        """Initiate shutdown.
+
+        Args:
+            graceful: If True, perform a graceful shutdown. If False, expedite shutdown.
+        """
+        if self._shutdown_in_progress:
+            return
+
+        self._shutdown_in_progress = True
         self._shutdown_event.set()
 
-    async def get_status(self) -> Dict[str, any]:
+        if not graceful:
+            # Expedited shutdown - don't wait for clean stop
+            logger.warning("Performing expedited shutdown...")
+            # Force exit after a short delay
+            asyncio.get_event_loop().call_later(0.5, sys.exit, 130)
+
+    async def get_status(self) -> dict[str, Any]:
         """Get current status of all endpoints."""
         status = {
             "daemon": {
