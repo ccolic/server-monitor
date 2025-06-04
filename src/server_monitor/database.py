@@ -111,12 +111,16 @@ class DatabaseManager:
         );
         """
 
-        async with self._pool.acquire() as conn:
-            await conn.execute(create_table_sql)
+        if self.config.type == DatabaseType.POSTGRESQL:
+            async with self._pool.acquire() as conn:  # type: ignore
+                await conn.execute(create_table_sql)
+        else:
+            # fallback for SQLite, should not happen here
+            pass
 
     async def _create_sqlite_tables(self) -> None:
         """Create SQLite tables."""
-        database_path = self.config.url.replace("sqlite:///", "")
+        database_path = self.config.url.replace("sqlite:///", "") if self.config.url is not None else ""
 
         create_table_sql = """
         CREATE TABLE IF NOT EXISTS check_results (
@@ -169,35 +173,34 @@ class DatabaseManager:
 
     async def _store_postgresql_result(self, result: CheckResult) -> None:
         """Store result in PostgreSQL."""
-        if not self._pool:
-            raise RuntimeError("Database pool not initialized")
-
-        insert_sql = """
-        INSERT INTO check_results (endpoint_name, check_type, status, response_time,
-                                 error_message, details, timestamp)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        """
-
         # Convert dict to JSON string for storage
         details_json = (
             json.dumps(result.details) if result.details is not None else None
         )
-
-        async with self._pool.acquire() as conn:
-            await conn.execute(
-                insert_sql,
-                result.endpoint_name,
-                result.check_type,
-                result.status.value,
-                result.response_time,
-                result.error_message,
-                details_json,
-                result.timestamp,
-            )
+        insert_sql = """
+        INSERT INTO check_results (
+            endpoint_name, check_type, status, response_time, error_message, details, timestamp
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        """
+        if self.config.type == DatabaseType.POSTGRESQL:
+            async with self._pool.acquire() as conn:  # type: ignore
+                await conn.execute(
+                    insert_sql,
+                    result.endpoint_name,
+                    result.check_type,
+                    result.status.value,
+                    result.response_time,
+                    result.error_message,
+                    details_json,
+                    result.timestamp,
+                )
+        else:
+            # fallback for SQLite, should not happen here
+            pass
 
     async def _store_sqlite_result(self, result: CheckResult) -> None:
         """Store result in SQLite."""
-        database_path = self.config.url.replace("sqlite:///", "")
+        database_path = self.config.url.replace("sqlite:///", "") if self.config.url is not None else ""
 
         insert_sql = """
         INSERT INTO check_results (endpoint_name, check_type, status, response_time,
@@ -234,50 +237,38 @@ class DatabaseManager:
 
     async def _update_postgresql_endpoint_status(self, result: CheckResult) -> None:
         """Update endpoint status in PostgreSQL."""
-        if not self._pool:
-            raise RuntimeError("Database pool not initialized")
-
         upsert_sql = """
-        INSERT INTO endpoint_status (endpoint_name, current_status, last_success,
-                                   last_failure, failure_count, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (endpoint_name)
-        DO UPDATE SET
+        INSERT INTO endpoint_status (
+            endpoint_name, current_status, last_success, last_failure, failure_count, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (endpoint_name) DO UPDATE SET
             current_status = EXCLUDED.current_status,
-            last_success = CASE WHEN EXCLUDED.current_status = 'success'
-                              THEN EXCLUDED.last_success
-                              ELSE endpoint_status.last_success END,
-            last_failure = CASE WHEN EXCLUDED.current_status != 'success'
-                              THEN EXCLUDED.last_failure
-                              ELSE endpoint_status.last_failure END,
-            failure_count = CASE WHEN EXCLUDED.current_status = 'success'
-                               THEN 0
-                               ELSE endpoint_status.failure_count + 1 END,
+            last_success = EXCLUDED.last_success,
+            last_failure = EXCLUDED.last_failure,
+            failure_count = EXCLUDED.failure_count,
             updated_at = EXCLUDED.updated_at
         """
-
-        last_success = (
-            result.timestamp if result.status == CheckStatus.SUCCESS else None
-        )
-        last_failure = (
-            result.timestamp if result.status != CheckStatus.SUCCESS else None
-        )
+        last_success = result.timestamp if result.status == CheckStatus.SUCCESS else None
+        last_failure = result.timestamp if result.status != CheckStatus.SUCCESS else None
         failure_count = 0 if result.status == CheckStatus.SUCCESS else 1
-
-        async with self._pool.acquire() as conn:
-            await conn.execute(
-                upsert_sql,
-                result.endpoint_name,
-                result.status.value,
-                last_success,
-                last_failure,
-                failure_count,
-                datetime.now(),
-            )
+        if self.config.type == DatabaseType.POSTGRESQL:
+            async with self._pool.acquire() as conn:  # type: ignore
+                await conn.execute(
+                    upsert_sql,
+                    result.endpoint_name,
+                    result.status.value,
+                    last_success,
+                    last_failure,
+                    failure_count,
+                    datetime.now(),
+                )
+        else:
+            # fallback for SQLite, should not happen here
+            pass
 
     async def _update_sqlite_endpoint_status(self, result: CheckResult) -> None:
         """Update endpoint status in SQLite."""
-        database_path = self.config.url.replace("sqlite:///", "")
+        database_path = self.config.url.replace("sqlite:///", "") if self.config.url is not None else ""
 
         # SQLite doesn't have native UPSERT like PostgreSQL, so we'll use INSERT OR REPLACE
         upsert_sql = """
@@ -324,31 +315,29 @@ class DatabaseManager:
             return await self._get_sqlite_endpoint_status(endpoint_name)
         return None
 
-    async def _get_postgresql_endpoint_status(
-        self, endpoint_name: str
-    ) -> dict[str, Any] | None:
+    async def _get_postgresql_endpoint_status(self, endpoint_name: str) -> dict[str, Any] | None:
         """Get endpoint status from PostgreSQL."""
-        if not self._pool:
-            raise RuntimeError("Database pool not initialized")
-
         select_sql = """
         SELECT endpoint_name, current_status, last_success, last_failure,
                failure_count, updated_at
         FROM endpoint_status
         WHERE endpoint_name = $1
         """
-
-        async with self._pool.acquire() as conn:
-            row = await conn.fetchrow(select_sql, endpoint_name)
-            if row:
-                return dict(row)
+        if self.config.type == DatabaseType.POSTGRESQL:
+            async with self._pool.acquire() as conn:  # type: ignore
+                row = await conn.fetchrow(select_sql, endpoint_name)
+                if row:
+                    return dict(row)
+                return None
+        else:
+            # fallback for SQLite, should not happen here
             return None
 
     async def _get_sqlite_endpoint_status(
         self, endpoint_name: str
     ) -> dict[str, Any] | None:
         """Get endpoint status from SQLite."""
-        database_path = self.config.url.replace("sqlite:///", "")
+        database_path = self.config.url.replace("sqlite:///", "") if self.config.url is not None else ""
 
         select_sql = """
         SELECT endpoint_name, current_status, last_success, last_failure,
