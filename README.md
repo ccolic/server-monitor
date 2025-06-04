@@ -74,7 +74,19 @@ global:
       port: 587
       username: user@example.com
       password: "your-password"
-      use_tls: true
+      connection_method: starttls  # Options: 'starttls', 'ssl', or 'plain'
+      # Connection Method Examples:
+      # For STARTTLS (common ports: 587, 25):
+      #   connection_method: starttls
+      #   port: 587
+      # 
+      # For Direct SSL/TLS (common ports: 465):
+      #   connection_method: ssl
+      #   port: 465
+      # 
+      # For Plain/Unsecured (not recommended):
+      #   connection_method: plain
+      #   port: 25
       from_email: monitor@example.com
     recipients:
       - alerts@example.com
