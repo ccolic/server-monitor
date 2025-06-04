@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any
+import json
 
 import aiosmtplib
 import httpx
@@ -105,28 +106,16 @@ class EmailNotifier(BaseNotifier):
             msg.attach(MIMEText(body, "html"))
 
             # Send email
-            smtp_args = {
-                "hostname": self.smtp_config.host,
-                "port": self.smtp_config.port,
-            }
-
-            # Configure connection method
-            if self.smtp_config.connection_method == SMTPConnectionMethod.SSL:
-                smtp_args["use_tls"] = True
-                smtp_args["start_tls"] = False
-            elif self.smtp_config.connection_method == SMTPConnectionMethod.STARTTLS:
-                smtp_args["use_tls"] = False
-                smtp_args["start_tls"] = True
-            else:  # PLAIN
-                smtp_args["use_tls"] = False
-                smtp_args["start_tls"] = False
-
-            async with aiosmtplib.SMTP(**smtp_args) as smtp:
+            async with aiosmtplib.SMTP(
+                hostname=self.smtp_config.host,
+                port=self.smtp_config.port,
+                use_tls=(self.smtp_config.connection_method == SMTPConnectionMethod.SSL),
+                start_tls=(self.smtp_config.connection_method == SMTPConnectionMethod.STARTTLS),
+            ) as smtp:
                 if self.smtp_config.username and self.smtp_config.password:
                     await smtp.login(
                         self.smtp_config.username, self.smtp_config.password
                     )
-
                 await smtp.send_message(msg)
 
             logger.info(
@@ -263,13 +252,13 @@ class WebhookNotifier(BaseNotifier):
         }
 
         if result.response_time is not None:
-            payload["response_time"] = result.response_time
+            payload["response_time"] = str(result.response_time)
 
         if result.error_message:
-            payload["error_message"] = result.error_message
+            payload["error_message"] = str(result.error_message)
 
         if result.details:
-            payload["details"] = result.details
+            payload["details"] = json.dumps(result.details)
 
         return payload
 
@@ -277,7 +266,7 @@ class WebhookNotifier(BaseNotifier):
 class NotificationManager:
     """Manages all notification sending."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.notifiers: list[BaseNotifier] = []
 
     def add_notifier(self, notifier: BaseNotifier) -> None:
