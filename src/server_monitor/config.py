@@ -134,7 +134,15 @@ class HTTPCheckConfig(BaseModel):
         """Validate HTTP check configuration."""
         if not self.url or not isinstance(self.url, str) or self.url.strip() == "":
             raise ValueError("HTTPCheckConfig: url must be a non-empty string")
-        if self.method not in ("GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"):
+        if self.method not in (
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE",
+            "HEAD",
+            "OPTIONS",
+            "PATCH",
+        ):
             raise ValueError(f"HTTPCheckConfig: method '{self.method}' is not valid")
         return self
 
@@ -165,7 +173,10 @@ class TLSCheckConfig(BaseModel):
     @model_validator(mode="after")
     def validate_tls_check_config(self) -> TLSCheckConfig:
         """Validate TLS check configuration."""
-        if self.cert_expiry_warning_days is not None and self.cert_expiry_warning_days < 0:
+        if (
+            self.cert_expiry_warning_days is not None
+            and self.cert_expiry_warning_days < 0
+        ):
             raise ValueError("TLSCheckConfig: cert_expiry_warning_days must be >= 0")
         return self
 
