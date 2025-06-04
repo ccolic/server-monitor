@@ -2,7 +2,6 @@
 
 import os
 import tempfile
-from pathlib import Path
 
 import pytest
 import yaml
@@ -13,7 +12,6 @@ from server_monitor.config import (
     EndpointConfig,
     HTTPCheckConfig,
     MonitorConfig,
-    NotificationEvent,
     TCPCheckConfig,
     TLSCheckConfig,
     load_config,
@@ -93,7 +91,9 @@ def test_http_config_invalid_url():
 
 def test_http_config_invalid_method():
     with pytest.raises(ValueError):
-        HTTPCheckConfig(url="https://example.com", method="INVALID", timeout=30, expected_status=200)
+        HTTPCheckConfig(
+            url="https://example.com", method="INVALID", timeout=30, expected_status=200
+        )
 
 
 def test_tcp_config_validation():
@@ -121,7 +121,9 @@ def test_tls_config_validation():
 
 def test_tls_config_invalid_expiry_days():
     with pytest.raises(ValueError):
-        TLSCheckConfig(host="example.com", port=443, timeout=30, cert_expiry_warning_days=-1)
+        TLSCheckConfig(
+            host="example.com", port=443, timeout=30, cert_expiry_warning_days=-1
+        )
 
 
 def test_endpoint_config_validation():

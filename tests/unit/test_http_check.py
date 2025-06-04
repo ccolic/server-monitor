@@ -1,8 +1,11 @@
-import pytest
-import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import httpx
+import pytest
+
 from server_monitor.checks import CheckStatus, HTTPCheck
 from server_monitor.config import CheckType, EndpointConfig, HTTPCheckConfig
+
 
 @pytest.mark.asyncio
 async def test_http_check_content_match_plain_text():
@@ -11,7 +14,11 @@ async def test_http_check_content_match_plain_text():
         type=CheckType.HTTP,
         interval=60,
         http=HTTPCheckConfig(
-            url="https://example.com", method="GET", timeout=30, expected_status=200, content_match="Example Domain"
+            url="https://example.com",
+            method="GET",
+            timeout=30,
+            expected_status=200,
+            content_match="Example Domain",
         ),
     )
     check = HTTPCheck(config)
@@ -25,6 +32,7 @@ async def test_http_check_content_match_plain_text():
         result = await check.execute()
     assert result.status == CheckStatus.SUCCESS
 
+
 @pytest.mark.asyncio
 async def test_http_check_unexpected_status_and_content():
     config = EndpointConfig(
@@ -32,7 +40,11 @@ async def test_http_check_unexpected_status_and_content():
         type=CheckType.HTTP,
         interval=60,
         http=HTTPCheckConfig(
-            url="https://example.com", method="GET", timeout=30, expected_status=404, content_match="Not Found"
+            url="https://example.com",
+            method="GET",
+            timeout=30,
+            expected_status=404,
+            content_match="Not Found",
         ),
     )
     check = HTTPCheck(config)
@@ -49,6 +61,7 @@ async def test_http_check_unexpected_status_and_content():
     assert "expected_status" in result.details
     # Accept that content_match may not be present if status fails first
 
+
 @pytest.mark.asyncio
 async def test_http_check_invalid_regex():
     config = EndpointConfig(
@@ -56,7 +69,12 @@ async def test_http_check_invalid_regex():
         type=CheckType.HTTP,
         interval=60,
         http=HTTPCheckConfig(
-            url="https://example.com", method="GET", timeout=30, expected_status=200, content_match="[unclosed", content_regex=True
+            url="https://example.com",
+            method="GET",
+            timeout=30,
+            expected_status=200,
+            content_match="[unclosed",
+            content_regex=True,
         ),
     )
     check = HTTPCheck(config)
@@ -71,6 +89,7 @@ async def test_http_check_invalid_regex():
     assert result.status == CheckStatus.ERROR
     assert "error_type" in result.details
     assert result.details["error_type"] == "error"
+
 
 @pytest.mark.asyncio
 async def test_http_check_network_error():

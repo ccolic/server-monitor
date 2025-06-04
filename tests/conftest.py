@@ -1,6 +1,7 @@
 """Pytest configuration."""
 
 import asyncio
+
 import pytest
 
 

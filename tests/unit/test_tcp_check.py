@@ -1,7 +1,10 @@
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import AsyncMock, patch
+
 from server_monitor.checks import CheckStatus, TCPCheck
 from server_monitor.config import CheckType, EndpointConfig, TCPCheckConfig
+
 
 @pytest.mark.asyncio
 async def test_tcp_check_general_exception():
@@ -17,6 +20,7 @@ async def test_tcp_check_general_exception():
     assert result.status == CheckStatus.ERROR
     assert result.details["error_type"] == "OSError"
 
+
 @pytest.mark.asyncio
 async def test_tcp_check_host_not_found():
     config = EndpointConfig(
@@ -26,10 +30,13 @@ async def test_tcp_check_host_not_found():
         tcp=TCPCheckConfig(host="no.such.host", port=80, timeout=10),
     )
     check = TCPCheck(config)
-    with patch("asyncio.open_connection", side_effect=OSError("Name or service not known")):
+    with patch(
+        "asyncio.open_connection", side_effect=OSError("Name or service not known")
+    ):
         result = await check.execute()
     assert result.status == CheckStatus.ERROR
     assert result.details["error_type"] == "OSError"
+
 
 @pytest.mark.asyncio
 async def test_tcp_check_connection_reset():
@@ -40,7 +47,9 @@ async def test_tcp_check_connection_reset():
         tcp=TCPCheckConfig(host="example.com", port=80, timeout=10),
     )
     check = TCPCheck(config)
-    with patch("asyncio.open_connection", side_effect=ConnectionResetError("reset by peer")):
+    with patch(
+        "asyncio.open_connection", side_effect=ConnectionResetError("reset by peer")
+    ):
         result = await check.execute()
     assert result.status == CheckStatus.ERROR
     assert result.details["error_type"] == "ConnectionResetError"
