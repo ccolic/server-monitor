@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import aiosmtplib
 import httpx
@@ -16,6 +16,7 @@ from email.mime.text import MIMEText
 from .config import (
     EmailNotificationConfig,
     NotificationEvent,
+    SMTPConnectionMethod,
     WebhookNotificationConfig,
 )
 from .database import CheckResult, CheckStatus
@@ -29,7 +30,7 @@ class NotificationContext:
     def __init__(
         self,
         result: CheckResult,
-        previous_status: Optional[CheckStatus] = None,
+        previous_status: CheckStatus | None = None,
         failure_count: int = 0,
     ):
         self.result = result
@@ -105,11 +106,23 @@ class EmailNotifier(BaseNotifier):
             msg.attach(MIMEText(body, "html"))
 
             # Send email
-            async with aiosmtplib.SMTP(
-                hostname=self.smtp_config.host,
-                port=self.smtp_config.port,
-                use_tls=self.smtp_config.use_tls,
-            ) as smtp:
+            smtp_args = {
+                "hostname": self.smtp_config.host,
+                "port": self.smtp_config.port,
+            }
+            
+            # Configure connection method
+            if self.smtp_config.connection_method == SMTPConnectionMethod.SSL:
+                smtp_args["use_tls"] = True
+                smtp_args["start_tls"] = False
+            elif self.smtp_config.connection_method == SMTPConnectionMethod.STARTTLS:
+                smtp_args["use_tls"] = False
+                smtp_args["start_tls"] = True
+            else:  # PLAIN
+                smtp_args["use_tls"] = False
+                smtp_args["start_tls"] = False
+                
+            async with aiosmtplib.SMTP(**smtp_args) as smtp:
                 if self.smtp_config.username and self.smtp_config.password:
                     await smtp.login(
                         self.smtp_config.username, self.smtp_config.password
@@ -236,7 +249,7 @@ class WebhookNotifier(BaseNotifier):
             )
             return False
 
-    def _create_webhook_payload(self, context: NotificationContext) -> Dict[str, Any]:
+    def _create_webhook_payload(self, context: NotificationContext) -> dict[str, Any]:
         """Create webhook payload."""
         result = context.result
 
@@ -266,7 +279,7 @@ class NotificationManager:
     """Manages all notification sending."""
 
     def __init__(self):
-        self.notifiers: List[BaseNotifier] = []
+        self.notifiers: list[BaseNotifier] = []
 
     def add_notifier(self, notifier: BaseNotifier) -> None:
         """Add a notifier to the manager."""
@@ -310,10 +323,10 @@ class NotificationManager:
 
 
 def create_notification_manager(
-    global_email_config: Optional[EmailNotificationConfig] = None,
-    global_webhook_config: Optional[WebhookNotificationConfig] = None,
-    endpoint_email_config: Optional[EmailNotificationConfig] = None,
-    endpoint_webhook_config: Optional[WebhookNotificationConfig] = None,
+    global_email_config: EmailNotificationConfig | None = None,
+    global_webhook_config: WebhookNotificationConfig | None = None,
+    endpoint_email_config: EmailNotificationConfig | None = None,
+    endpoint_webhook_config: WebhookNotificationConfig | None = None,
 ) -> NotificationManager:
     """Create notification manager with configured notifiers."""
     manager = NotificationManager()

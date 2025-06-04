@@ -32,6 +32,14 @@ class DatabaseType(str, Enum):
     POSTGRESQL = "postgresql"
 
 
+class SMTPConnectionMethod(str, Enum):
+    """SMTP connection methods."""
+
+    STARTTLS = "starttls"
+    SSL = "ssl"
+    PLAIN = "plain"
+
+
 class SMTPConfig(BaseModel):
     """SMTP configuration."""
 
@@ -39,7 +47,7 @@ class SMTPConfig(BaseModel):
     port: int = 587
     username: str | None = None
     password: str | None = None
-    use_tls: bool = True
+    connection_method: SMTPConnectionMethod = SMTPConnectionMethod.STARTTLS
     from_email: str
 
 
