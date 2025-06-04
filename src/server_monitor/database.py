@@ -44,7 +44,7 @@ class DatabaseManager:
 
     def __init__(self, config: DatabaseConfig):
         self.config = config
-        self._pool: Optional[Union[asyncpg.Pool, aiosqlite.Connection]] = None
+        self._pool: asyncpg.Pool | aiosqlite.Connection | None = None
 
     async def initialize(self) -> None:
         """Initialize database connection."""
@@ -94,13 +94,13 @@ class DatabaseManager:
             timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
-        
-        CREATE INDEX IF NOT EXISTS idx_check_results_endpoint_timestamp 
+
+        CREATE INDEX IF NOT EXISTS idx_check_results_endpoint_timestamp
         ON check_results(endpoint_name, timestamp DESC);
-        
-        CREATE INDEX IF NOT EXISTS idx_check_results_status 
+
+        CREATE INDEX IF NOT EXISTS idx_check_results_status
         ON check_results(status);
-        
+
         CREATE TABLE IF NOT EXISTS endpoint_status (
             endpoint_name VARCHAR(255) PRIMARY KEY,
             current_status VARCHAR(20) NOT NULL,
@@ -130,13 +130,13 @@ class DatabaseManager:
             timestamp TEXT NOT NULL,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
-        
-        CREATE INDEX IF NOT EXISTS idx_check_results_endpoint_timestamp 
+
+        CREATE INDEX IF NOT EXISTS idx_check_results_endpoint_timestamp
         ON check_results(endpoint_name, timestamp DESC);
-        
-        CREATE INDEX IF NOT EXISTS idx_check_results_status 
+
+        CREATE INDEX IF NOT EXISTS idx_check_results_status
         ON check_results(status);
-        
+
         CREATE TABLE IF NOT EXISTS endpoint_status (
             endpoint_name TEXT PRIMARY KEY,
             current_status TEXT NOT NULL,
@@ -173,7 +173,7 @@ class DatabaseManager:
             raise RuntimeError("Database pool not initialized")
 
         insert_sql = """
-        INSERT INTO check_results (endpoint_name, check_type, status, response_time, 
+        INSERT INTO check_results (endpoint_name, check_type, status, response_time,
                                  error_message, details, timestamp)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
         """
@@ -200,7 +200,7 @@ class DatabaseManager:
         database_path = self.config.url.replace("sqlite:///", "")
 
         insert_sql = """
-        INSERT INTO check_results (endpoint_name, check_type, status, response_time, 
+        INSERT INTO check_results (endpoint_name, check_type, status, response_time,
                                  error_message, details, timestamp)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """
@@ -238,19 +238,19 @@ class DatabaseManager:
             raise RuntimeError("Database pool not initialized")
 
         upsert_sql = """
-        INSERT INTO endpoint_status (endpoint_name, current_status, last_success, 
+        INSERT INTO endpoint_status (endpoint_name, current_status, last_success,
                                    last_failure, failure_count, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (endpoint_name) 
+        ON CONFLICT (endpoint_name)
         DO UPDATE SET
             current_status = EXCLUDED.current_status,
-            last_success = CASE WHEN EXCLUDED.current_status = 'success' 
-                              THEN EXCLUDED.last_success 
+            last_success = CASE WHEN EXCLUDED.current_status = 'success'
+                              THEN EXCLUDED.last_success
                               ELSE endpoint_status.last_success END,
-            last_failure = CASE WHEN EXCLUDED.current_status != 'success' 
-                              THEN EXCLUDED.last_failure 
+            last_failure = CASE WHEN EXCLUDED.current_status != 'success'
+                              THEN EXCLUDED.last_failure
                               ELSE endpoint_status.last_failure END,
-            failure_count = CASE WHEN EXCLUDED.current_status = 'success' 
+            failure_count = CASE WHEN EXCLUDED.current_status = 'success'
                                THEN 0
                                ELSE endpoint_status.failure_count + 1 END,
             updated_at = EXCLUDED.updated_at
@@ -282,16 +282,16 @@ class DatabaseManager:
         # SQLite doesn't have native UPSERT like PostgreSQL, so we'll use INSERT OR REPLACE
         upsert_sql = """
         INSERT OR REPLACE INTO endpoint_status (
-            endpoint_name, current_status, last_success, last_failure, 
+            endpoint_name, current_status, last_success, last_failure,
             failure_count, updated_at
         )
         VALUES (
-            ?, ?, 
-            CASE WHEN ? = 'success' THEN ? ELSE 
+            ?, ?,
+            CASE WHEN ? = 'success' THEN ? ELSE
                 (SELECT last_success FROM endpoint_status WHERE endpoint_name = ?) END,
-            CASE WHEN ? != 'success' THEN ? ELSE 
+            CASE WHEN ? != 'success' THEN ? ELSE
                 (SELECT last_failure FROM endpoint_status WHERE endpoint_name = ?) END,
-            CASE WHEN ? = 'success' THEN 0 ELSE 
+            CASE WHEN ? = 'success' THEN 0 ELSE
                 COALESCE((SELECT failure_count FROM endpoint_status WHERE endpoint_name = ?), 0) + 1 END,
             ?
         )
@@ -332,7 +332,7 @@ class DatabaseManager:
             raise RuntimeError("Database pool not initialized")
 
         select_sql = """
-        SELECT endpoint_name, current_status, last_success, last_failure, 
+        SELECT endpoint_name, current_status, last_success, last_failure,
                failure_count, updated_at
         FROM endpoint_status
         WHERE endpoint_name = $1
@@ -351,7 +351,7 @@ class DatabaseManager:
         database_path = self.config.url.replace("sqlite:///", "")
 
         select_sql = """
-        SELECT endpoint_name, current_status, last_success, last_failure, 
+        SELECT endpoint_name, current_status, last_success, last_failure,
                failure_count, updated_at
         FROM endpoint_status
         WHERE endpoint_name = ?

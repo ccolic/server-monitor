@@ -185,7 +185,7 @@ class EmailNotifier(BaseNotifier):
                 <div class="status">{result.status.value.upper()}</div>
                 <div>Endpoint: {result.endpoint_name}</div>
             </div>
-            
+
             <div class="content">
                 <h3>Check Details</h3>
                 <table>
@@ -196,7 +196,7 @@ class EmailNotifier(BaseNotifier):
                     {f"<tr><td><strong>Error:</strong></td><td>{result.error_message}</td></tr>" if result.error_message else ""}
                     {f"<tr><td><strong>Failure Count:</strong></td><td>{context.failure_count}</td></tr>" if context.failure_count > 0 else ""}
                 </table>
-                
+
                 {f'<div class="details"><h4>Additional Details</h4><table>{details_rows}</table></div>' if details_rows else ""}
             </div>
         </body>
