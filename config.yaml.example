@@ -1,0 +1,78 @@
+global:
+  log_level: INFO
+  log_file: server-monitor.log
+  max_concurrent_checks: 10
+  email_notifications:
+    enabled: true
+    events:
+      - both
+    smtp:
+      host: smtp.example.com
+      port: 587
+      username: user@example.com
+      password: "your-password"
+      use_tls: true
+      from_email: monitor@example.com
+    recipients:
+      - alerts@example.com
+    subject_template: "Monitor Alert: {endpoint_name} - {status}"
+  webhook_notifications:
+    enabled: true
+    events:
+      - failure
+    webhook:
+      url: https://hooks.slack.com/services/your/webhook/url
+      method: POST
+      headers:
+        Content-Type: application/json
+      timeout: 30
+  database:
+    type: sqlite
+    database: monitor.db
+
+endpoints:
+  - name: Example Website
+    type: http
+    interval: 60
+    enabled: true
+    http:
+      url: https://example.com
+      method: GET
+      timeout: 30
+      expected_status: 200
+      content_match: Example Domain
+      follow_redirects: true
+  
+  - name: Example API
+    type: http
+    interval: 30
+    enabled: true
+    http:
+      url: https://api.example.com/health
+      method: GET
+      headers:
+        Authorization: Bearer your-token
+      timeout: 5
+      expected_status: 200
+  
+  - name: Database Server
+    type: tcp
+    interval: 120
+    enabled: true
+    tcp:
+      host: db.example.com
+      port: 5432
+      timeout: 10
+  
+  - name: HTTPS Certificate
+    type: tls
+    interval: 86400
+    enabled: true
+    tls:
+      host: example.com
+      port: 443
+      timeout: 30
+      cert_expiry_warning_days: 30
+    email_notifications:
+      events:
+        - failure
