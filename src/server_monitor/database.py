@@ -37,10 +37,8 @@ class CheckResult(BaseModel):
     error_message: str | None = None
     details: dict[str, Any] | None = None
     timestamp: datetime
-    
-    model_config = {
-        "json_encoders": {datetime: lambda v: v.isoformat()}
-    }
+
+    model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
 
 
 class DatabaseManager:
@@ -183,7 +181,9 @@ class DatabaseManager:
         """
 
         # Convert dict to JSON string for storage
-        details_json = json.dumps(result.details) if result.details is not None else None
+        details_json = (
+            json.dumps(result.details) if result.details is not None else None
+        )
 
         async with self._pool.acquire() as conn:
             await conn.execute(
@@ -208,7 +208,9 @@ class DatabaseManager:
         """
 
         # Convert dict to JSON string for storage
-        details_json = json.dumps(result.details) if result.details is not None else None
+        details_json = (
+            json.dumps(result.details) if result.details is not None else None
+        )
 
         async with aiosqlite.connect(database_path) as conn:
             await conn.execute(

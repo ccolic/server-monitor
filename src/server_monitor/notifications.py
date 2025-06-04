@@ -110,7 +110,7 @@ class EmailNotifier(BaseNotifier):
                 "hostname": self.smtp_config.host,
                 "port": self.smtp_config.port,
             }
-            
+
             # Configure connection method
             if self.smtp_config.connection_method == SMTPConnectionMethod.SSL:
                 smtp_args["use_tls"] = True
@@ -121,7 +121,7 @@ class EmailNotifier(BaseNotifier):
             else:  # PLAIN
                 smtp_args["use_tls"] = False
                 smtp_args["start_tls"] = False
-                
+
             async with aiosmtplib.SMTP(**smtp_args) as smtp:
                 if self.smtp_config.username and self.smtp_config.password:
                     await smtp.login(

@@ -65,12 +65,16 @@ class EndpointMonitor:
                 result = await self.check.execute()
 
                 # Get previous status for notification context
-                previous_status_data = await self.db_manager.get_endpoint_status(self.config.name)
+                previous_status_data = await self.db_manager.get_endpoint_status(
+                    self.config.name
+                )
                 previous_status = None
                 failure_count = 0
 
                 if previous_status_data:
-                    previous_status = CheckStatus(previous_status_data["current_status"])
+                    previous_status = CheckStatus(
+                        previous_status_data["current_status"]
+                    )
                     failure_count = previous_status_data.get("failure_count", 0)
 
                 # Store result in database
@@ -93,11 +97,15 @@ class EndpointMonitor:
                 )
 
             except Exception as e:
-                logger.error("Error in monitor loop", endpoint=self.config.name, error=str(e))
+                logger.error(
+                    "Error in monitor loop", endpoint=self.config.name, error=str(e)
+                )
 
             # Wait for next check interval
             try:
-                await asyncio.wait_for(self._stop_event.wait(), timeout=self.config.interval)
+                await asyncio.wait_for(
+                    self._stop_event.wait(), timeout=self.config.interval
+                )
                 # If we reach here, stop event was set
                 break
             except TimeoutError:
@@ -158,7 +166,9 @@ class MonitorDaemon:
 
         await asyncio.gather(*start_tasks)
 
-        logger.info("Monitoring daemon started", endpoints=list(self.endpoint_monitors.keys()))
+        logger.info(
+            "Monitoring daemon started", endpoints=list(self.endpoint_monitors.keys())
+        )
 
         # Wait for shutdown signal
         await self._shutdown_event.wait()
@@ -174,7 +184,10 @@ class MonitorDaemon:
 
         try:
             # Implement a timeout for the cleanup tasks
-            await asyncio.wait_for(asyncio.gather(*stop_tasks, return_exceptions=True), timeout=self._shutdown_timeout)
+            await asyncio.wait_for(
+                asyncio.gather(*stop_tasks, return_exceptions=True),
+                timeout=self._shutdown_timeout,
+            )
         except TimeoutError:
             logger.warning(f"Clean shutdown timed out after {self._shutdown_timeout}s")
 
@@ -193,7 +206,9 @@ class MonitorDaemon:
             self._interrupt_count += 1
 
             if self._interrupt_count == 1:
-                logger.info(f"Received signal {signum}, initiating graceful shutdown...")
+                logger.info(
+                    f"Received signal {signum}, initiating graceful shutdown..."
+                )
                 asyncio.create_task(self._shutdown(graceful=True))
             elif self._interrupt_count == 2:
                 logger.warning("Second interrupt received, expediting shutdown...")
