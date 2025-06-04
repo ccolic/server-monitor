@@ -129,6 +129,15 @@ class HTTPCheckConfig(BaseModel):
     follow_redirects: bool = True
     verify_ssl: bool = True
 
+    @model_validator(mode="after")
+    def validate_http_check_config(self) -> HTTPCheckConfig:
+        """Validate HTTP check configuration."""
+        if not self.url or not isinstance(self.url, str) or self.url.strip() == "":
+            raise ValueError("HTTPCheckConfig: url must be a non-empty string")
+        if self.method not in ("GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"):
+            raise ValueError(f"HTTPCheckConfig: method '{self.method}' is not valid")
+        return self
+
 
 class TCPCheckConfig(BaseModel):
     """TCP check configuration."""
@@ -136,6 +145,13 @@ class TCPCheckConfig(BaseModel):
     host: str
     port: int
     timeout: int = 10
+
+    @model_validator(mode="after")
+    def validate_tcp_check_config(self) -> TCPCheckConfig:
+        """Validate TCP check configuration."""
+        if not (0 < self.port < 65536):
+            raise ValueError("TCPCheckConfig: port must be between 1 and 65535")
+        return self
 
 
 class TLSCheckConfig(BaseModel):
@@ -145,6 +161,13 @@ class TLSCheckConfig(BaseModel):
     port: int = 443
     timeout: int = 10
     cert_expiry_warning_days: int = 30
+
+    @model_validator(mode="after")
+    def validate_tls_check_config(self) -> TLSCheckConfig:
+        """Validate TLS check configuration."""
+        if self.cert_expiry_warning_days is not None and self.cert_expiry_warning_days < 0:
+            raise ValueError("TLSCheckConfig: cert_expiry_warning_days must be >= 0")
+        return self
 
 
 class EndpointConfig(BaseModel):

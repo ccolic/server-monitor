@@ -86,12 +86,27 @@ def test_http_config_validation():
     assert 204 in http_config.expected_status
 
 
+def test_http_config_invalid_url():
+    with pytest.raises(ValueError):
+        HTTPCheckConfig(url="", method="GET", timeout=30, expected_status=200)
+
+
+def test_http_config_invalid_method():
+    with pytest.raises(ValueError):
+        HTTPCheckConfig(url="https://example.com", method="INVALID", timeout=30, expected_status=200)
+
+
 def test_tcp_config_validation():
     """Test TCP config validation."""
     # Valid config
     tcp_config = TCPCheckConfig(host="example.com", port=80, timeout=10)
     assert tcp_config.host == "example.com"
     assert tcp_config.port == 80
+
+
+def test_tcp_config_invalid_port():
+    with pytest.raises(ValueError):
+        TCPCheckConfig(host="example.com", port=70000, timeout=10)
 
 
 def test_tls_config_validation():
@@ -102,6 +117,11 @@ def test_tls_config_validation():
     )
     assert tls_config.host == "example.com"
     assert tls_config.cert_expiry_warning_days == 14
+
+
+def test_tls_config_invalid_expiry_days():
+    with pytest.raises(ValueError):
+        TLSCheckConfig(host="example.com", port=443, timeout=30, cert_expiry_warning_days=-1)
 
 
 def test_endpoint_config_validation():
@@ -166,3 +186,17 @@ def test_endpoint_config_validation_failure():
             type=CheckType.TLS,
             interval=86400,
         )
+
+
+def test_monitor_config_missing_endpoints():
+    # Should raise ValueError if endpoints is missing or empty
+    with pytest.raises(ValueError):
+        MonitorConfig(global_config=None, endpoints=None)
+    with pytest.raises(ValueError):
+        MonitorConfig(global_config=None, endpoints=[])
+
+
+def test_load_config_invalid_file():
+    # Should raise FileNotFoundError or OSError
+    with pytest.raises((FileNotFoundError, OSError)):
+        load_config("/no/such/file.yaml")
