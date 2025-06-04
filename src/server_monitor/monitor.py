@@ -26,7 +26,7 @@ class EndpointMonitor:
         config: EndpointConfig,
         db_manager: DatabaseManager,
         global_config: MonitorConfig,
-    ):
+    ) -> None:
         self.config = config
         self.db_manager = db_manager
         self.global_config = global_config
@@ -119,7 +119,7 @@ class EndpointMonitor:
 class MonitorDaemon:
     """Main monitoring daemon that manages all endpoint monitors."""
 
-    def __init__(self, config: MonitorConfig):
+    def __init__(self, config: MonitorConfig) -> None:
         self.config = config
         self.db_manager = DatabaseManager(config.global_config.database)
         self.endpoint_monitors: dict[str, EndpointMonitor] = {}
@@ -160,7 +160,7 @@ class MonitorDaemon:
         self._setup_signal_handlers()
 
         # Start all endpoint monitors
-        start_tasks = []
+        start_tasks: list[asyncio.Task] = []
         for monitor in self.endpoint_monitors.values():
             start_tasks.append(monitor.start())
 
@@ -178,7 +178,7 @@ class MonitorDaemon:
         logger.info("Stopping monitoring daemon...")
 
         # Stop all endpoint monitors with timeout
-        stop_tasks = []
+        stop_tasks: list[asyncio.Task] = []
         for monitor in self.endpoint_monitors.values():
             stop_tasks.append(monitor.stop())
 
@@ -271,7 +271,7 @@ class MonitorDaemon:
         logger.info("Reloading configuration...")
 
         # Stop all current monitors
-        stop_tasks = []
+        stop_tasks: list[asyncio.Task] = []
         for monitor in self.endpoint_monitors.values():
             stop_tasks.append(monitor.stop())
 
@@ -287,7 +287,7 @@ class MonitorDaemon:
         await self.initialize()
 
         # Start monitors with new configuration
-        start_tasks = []
+        start_tasks: list[asyncio.Task] = []
         for monitor in self.endpoint_monitors.values():
             start_tasks.append(monitor.start())
 

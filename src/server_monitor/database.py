@@ -42,7 +42,7 @@ class CheckResult(BaseModel):
 class DatabaseManager:
     """Database manager for storing check results."""
 
-    def __init__(self, config: DatabaseConfig):
+    def __init__(self, config: DatabaseConfig) -> None:
         self.config = config
         self._pool: asyncpg.Pool | aiosqlite.Connection | None = None
 

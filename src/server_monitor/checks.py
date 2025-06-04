@@ -24,7 +24,7 @@ logger = structlog.get_logger(__name__)
 class BaseCheck(ABC):
     """Base class for all check types."""
 
-    def __init__(self, config: EndpointConfig):
+    def __init__(self, config: EndpointConfig) -> None:
         self.config = config
         self.name = config.name
 
@@ -36,9 +36,9 @@ class BaseCheck(ABC):
     def _create_result(
         self,
         status: CheckStatus,
-        response_time: float = None,
-        error_message: str = None,
-        details: dict[str, Any] = None,
+        response_time: float | None = None,
+        error_message: str | None = None,
+        details: dict[str, Any] | None = None,
     ) -> CheckResult:
         """Create a check result."""
         return CheckResult(
@@ -55,7 +55,7 @@ class BaseCheck(ABC):
 class HTTPCheck(BaseCheck):
     """HTTP/HTTPS check implementation."""
 
-    def __init__(self, config: EndpointConfig):
+    def __init__(self, config: EndpointConfig) -> None:
         super().__init__(config)
         if not config.http:
             raise ValueError("HTTP configuration is required for HTTP checks")
@@ -163,7 +163,7 @@ class HTTPCheck(BaseCheck):
 class TCPCheck(BaseCheck):
     """TCP connection check implementation."""
 
-    def __init__(self, config: EndpointConfig):
+    def __init__(self, config: EndpointConfig) -> None:
         super().__init__(config)
         if not config.tcp:
             raise ValueError("TCP configuration is required for TCP checks")
@@ -225,7 +225,7 @@ class TCPCheck(BaseCheck):
 class TLSCheck(BaseCheck):
     """TLS/SSL certificate check implementation."""
 
-    def __init__(self, config: EndpointConfig):
+    def __init__(self, config: EndpointConfig) -> None:
         super().__init__(config)
         if not config.tls:
             raise ValueError("TLS configuration is required for TLS checks")
@@ -265,9 +265,7 @@ class TLSCheck(BaseCheck):
                     # Check certificate validity
                     now = datetime.now(UTC)
                     not_valid_after = cert.not_valid_after.replace(tzinfo=UTC)
-                    not_valid_before = cert.not_valid_before.replace(
-                        tzinfo=UTC
-                    )
+                    not_valid_before = cert.not_valid_before.replace(tzinfo=UTC)
 
                     # Calculate days until expiry
                     days_until_expiry = (not_valid_after - now).days
