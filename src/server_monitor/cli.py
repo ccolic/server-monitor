@@ -6,10 +6,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import sys
-from pathlib import Path
-from typing import Optional
 
 import click
 import structlog
@@ -17,11 +14,11 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
-from .config import MonitorConfig, load_config
+from .config import load_config
 from .monitor import MonitorDaemon
 
 
-def configure_logging(log_level: str, log_file: Optional[str] = None) -> None:
+def configure_logging(log_level: str, log_file: str | None = None) -> None:
     """Configure application logging."""
     # Set up structlog
     processors = [

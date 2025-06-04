@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import re
-import socket
 import ssl
 import time
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Union
+from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 import structlog
@@ -39,7 +38,7 @@ class BaseCheck(ABC):
         status: CheckStatus,
         response_time: float = None,
         error_message: str = None,
-        details: Dict[str, Any] = None,
+        details: dict[str, Any] = None,
     ) -> CheckResult:
         """Create a check result."""
         return CheckResult(
@@ -49,7 +48,7 @@ class BaseCheck(ABC):
             response_time=response_time,
             error_message=error_message,
             details=details or {},
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
 
@@ -196,7 +195,7 @@ class TCPCheck(BaseCheck):
                 details={"host": self.tcp_config.host, "port": self.tcp_config.port},
             )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             response_time = time.time() - start_time
             return self._create_result(
                 status=CheckStatus.FAILURE,
@@ -264,10 +263,10 @@ class TLSCheck(BaseCheck):
                     cert = x509.load_der_x509_certificate(cert_der, default_backend())
 
                     # Check certificate validity
-                    now = datetime.now(timezone.utc)
-                    not_valid_after = cert.not_valid_after.replace(tzinfo=timezone.utc)
+                    now = datetime.now(UTC)
+                    not_valid_after = cert.not_valid_after.replace(tzinfo=UTC)
                     not_valid_before = cert.not_valid_before.replace(
-                        tzinfo=timezone.utc
+                        tzinfo=UTC
                     )
 
                     # Calculate days until expiry
@@ -365,7 +364,7 @@ class TLSCheck(BaseCheck):
                     },
                 )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             response_time = time.time() - start_time
             return self._create_result(
                 status=CheckStatus.FAILURE,

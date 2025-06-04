@@ -95,7 +95,7 @@ class DatabaseConfig(BaseModel):
     password: str | None = None
 
     @model_validator(mode="after")
-    def validate_database_config(self) -> "DatabaseConfig":
+    def validate_database_config(self) -> DatabaseConfig:
         """Validate database configuration."""
         if self.url:
             return self
@@ -165,7 +165,7 @@ class EndpointConfig(BaseModel):
     webhook_notifications: WebhookNotificationConfig | None = None
 
     @model_validator(mode="after")
-    def validate_check_config(self) -> "EndpointConfig":
+    def validate_check_config(self) -> EndpointConfig:
         """Validate check-specific configuration."""
         if self.type == CheckType.HTTP and self.http is None:
             raise ValueError("HTTP configuration required for HTTP checks")

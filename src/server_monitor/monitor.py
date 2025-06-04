@@ -6,11 +6,11 @@ import asyncio
 import signal
 import sys
 from concurrent.futures import TimeoutError
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 
-from .checks import BaseCheck, create_check
+from .checks import create_check
 from .config import EndpointConfig, MonitorConfig
 from .database import CheckStatus, DatabaseManager
 from .notifications import NotificationContext, create_notification_manager
@@ -37,7 +37,7 @@ class EndpointMonitor:
             endpoint_email_config=config.email_notifications,
             endpoint_webhook_config=config.webhook_notifications,
         )
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
         self._stop_event = asyncio.Event()
 
     async def start(self) -> None:

@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from abc import ABC, abstractmethod
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from typing import Any
 
 import aiosmtplib
 import httpx
 import structlog
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 
 from .config import (
     EmailNotificationConfig,
