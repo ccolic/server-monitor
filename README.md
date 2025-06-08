@@ -62,6 +62,8 @@ The configuration file is in YAML format and has the following structure:
 global:
   log_level: INFO
   log_file: server-monitor.log
+  log_max_bytes: 5242880  # 5 MB
+  log_backup_count: 3
   max_concurrent_checks: 10
 
   # Email notification settings

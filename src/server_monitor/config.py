@@ -219,6 +219,8 @@ class GlobalConfig(BaseModel):
 
     log_level: str = "INFO"
     log_file: str | None = None
+    log_max_bytes: int = 5242880  # Default: 5 MB
+    log_backup_count: int = 3  # Default: 3 backups
     max_concurrent_checks: int = 10
 
     # Default notification settings

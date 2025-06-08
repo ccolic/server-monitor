@@ -21,12 +21,21 @@ from .config import load_config
 from .monitor import MonitorDaemon
 
 
-def setup_logging(log_level: str = "INFO", log_file: str | None = None) -> None:
+def setup_logging(
+    log_level: str = "INFO",
+    log_file: str | None = None,
+    log_max_bytes: int = 5 * 1024 * 1024,
+    log_backup_count: int = 3,
+) -> None:
     """Set up logging configuration."""
     # Create log handlers
     log_handlers: list[Handler] = [logging.StreamHandler()]
     if log_file:
-        log_handlers.append(logging.FileHandler(log_file))
+        log_handlers.append(
+            logging.handlers.RotatingFileHandler(
+                log_file, maxBytes=log_max_bytes, backupCount=log_backup_count
+            )
+        )
 
     processors: list[
         Callable[
@@ -72,7 +81,9 @@ def start(config_path: str) -> None:
         # Configure logging
         log_level = config.global_config.log_level
         log_file = config.global_config.log_file
-        setup_logging(log_level, log_file)
+        log_max_bytes = config.global_config.log_max_bytes
+        log_backup_count = config.global_config.log_backup_count
+        setup_logging(log_level, log_file, log_max_bytes, log_backup_count)
 
         logger = structlog.get_logger("cli")
         logger.info("Starting server-monitor daemon", config_path=config_path)
@@ -157,6 +168,8 @@ def generate_config(output: str) -> None:
         "global": {
             "log_level": "INFO",
             "log_file": "server-monitor.log",
+            "log_max_bytes": 5242880,
+            "log_backup_count": 3,
             "max_concurrent_checks": 10,
             "email_notifications": {
                 "enabled": True,
