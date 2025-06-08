@@ -168,6 +168,8 @@ class MonitorDaemon:
         self._shutdown_in_progress = False
         self._interrupt_count = 0
         self._shutdown_timeout = 10.0  # seconds
+        self._original_sigterm_handler: Any = None
+        self._original_sigint_handler: Any = None
 
     async def initialize(self) -> None:
         """Initialize the daemon."""
@@ -221,6 +223,9 @@ class MonitorDaemon:
         """Stop the monitoring daemon."""
         logger.info("Stopping monitoring daemon...")
 
+        # Restore original signal handlers
+        self._restore_signal_handlers()
+
         # Stop health check server
         try:
             await self.health_server.stop()
@@ -250,6 +255,16 @@ class MonitorDaemon:
 
         logger.info("Monitoring daemon stopped")
 
+    def _restore_signal_handlers(self) -> None:
+        """Restore original signal handlers."""
+        if sys.platform != "win32":
+            if self._original_sigterm_handler is not None:
+                signal.signal(signal.SIGTERM, self._original_sigterm_handler)
+                self._original_sigterm_handler = None
+            if self._original_sigint_handler is not None:
+                signal.signal(signal.SIGINT, self._original_sigint_handler)
+                self._original_sigint_handler = None
+
     def _setup_signal_handlers(self) -> None:
         """Set up signal handlers for graceful shutdown."""
 
@@ -260,10 +275,23 @@ class MonitorDaemon:
                 logger.info(
                     f"Received signal {signum}, initiating graceful shutdown..."
                 )
-                asyncio.create_task(self._shutdown(graceful=True))
+                # Check if we have a running event loop before creating task
+                try:
+                    loop = asyncio.get_running_loop()
+                    if not loop.is_closed():
+                        asyncio.create_task(self._shutdown(graceful=True))
+                except RuntimeError:
+                    # No running event loop, set shutdown event directly
+                    self._shutdown_event.set()
             elif self._interrupt_count == 2:
                 logger.warning("Second interrupt received, expediting shutdown...")
-                asyncio.create_task(self._shutdown(graceful=False))
+                try:
+                    loop = asyncio.get_running_loop()
+                    if not loop.is_closed():
+                        asyncio.create_task(self._shutdown(graceful=False))
+                except RuntimeError:
+                    # No running event loop, force exit
+                    sys.exit(130)
             else:
                 logger.warning("Multiple interrupts received, forcing exit...")
                 # Force exit immediately on third Ctrl+C
@@ -271,8 +299,11 @@ class MonitorDaemon:
 
         # Only set up signal handlers on Unix systems
         if sys.platform != "win32":
-            signal.signal(signal.SIGTERM, signal_handler)
-            signal.signal(signal.SIGINT, signal_handler)
+            # Store original handlers before replacing them
+            self._original_sigterm_handler = signal.signal(
+                signal.SIGTERM, signal_handler
+            )
+            self._original_sigint_handler = signal.signal(signal.SIGINT, signal_handler)
 
     async def _shutdown(self, graceful: bool = True) -> None:
         """Initiate shutdown.

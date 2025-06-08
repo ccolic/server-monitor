@@ -85,35 +85,40 @@ async def test_config_reload(temp_config_file):
     """Test configuration reloading."""
     config = load_config(temp_config_file)
     daemon = MonitorDaemon(config)
-    await daemon.initialize()
 
-    # Modify config - add another endpoint
-    config_data = yaml.safe_load(Path(temp_config_file).read_text())
-    config_data["endpoints"].append(
-        {
-            "name": "Test HTTP 2",
-            "type": "http",
-            "interval": 2,
-            "enabled": True,
-            "http": {
-                "url": "https://httpbin.org/status/201",
-                "method": "GET",
-                "timeout": 5,
-                "expected_status": 201,
-            },
-        }
-    )
+    try:
+        await daemon.initialize()
 
-    # Save updated config
-    Path(temp_config_file).write_text(yaml.dump(config_data))
-    new_config = load_config(temp_config_file)
+        # Modify config - add another endpoint
+        config_data = yaml.safe_load(Path(temp_config_file).read_text())
+        config_data["endpoints"].append(
+            {
+                "name": "Test HTTP 2",
+                "type": "http",
+                "interval": 2,
+                "enabled": True,
+                "http": {
+                    "url": "https://httpbin.org/status/201",
+                    "method": "GET",
+                    "timeout": 5,
+                    "expected_status": 201,
+                },
+            }
+        )
 
-    # Reload configuration
-    await daemon.reload_config(new_config)
+        # Save updated config
+        Path(temp_config_file).write_text(yaml.dump(config_data))
+        new_config = load_config(temp_config_file)
 
-    # Verify new endpoint was added
-    assert len(daemon.endpoint_monitors) == 2
-    assert "Test HTTP 2" in daemon.endpoint_monitors
+        # Reload configuration
+        await daemon.reload_config(new_config)
+
+        # Verify new endpoint was added
+        assert len(daemon.endpoint_monitors) == 2
+        assert "Test HTTP 2" in daemon.endpoint_monitors
+    finally:
+        # Ensure daemon is properly stopped
+        await daemon.stop()
 
 
 @pytest.mark.asyncio
