@@ -15,8 +15,53 @@ from server_monitor.config import CheckType, EndpointConfig, TLSCheckConfig
 
 @pytest.mark.asyncio
 async def test_tls_check_not_yet_valid():
-    # ...existing code for not yet valid cert...
-    pass
+    config = EndpointConfig(
+        name="Test TLS Not Yet Valid",
+        type=CheckType.TLS,
+        interval=86400,
+        tls=TLSCheckConfig(
+            host="example.com", port=443, timeout=30, cert_expiry_warning_days=14
+        ),
+    )
+    check = TLSCheck(config)
+    private_key = rsa.generate_private_key(
+        public_exponent=65537, key_size=2048, backend=default_backend()
+    )
+    subject = issuer = x509.Name(
+        [x509.NameAttribute(NameOID.COMMON_NAME, "example.com")]
+    )
+    # Create a certificate that is not yet valid (starts tomorrow)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(private_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.now(UTC) + timedelta(days=1))  # Future date
+        .not_valid_after(datetime.now(UTC) + timedelta(days=90))
+        .sign(private_key, hashes.SHA256(), default_backend())
+    )
+    cert_der = cert.public_bytes(serialization.Encoding.DER)
+
+    mock_reader = AsyncMock()
+    mock_writer = AsyncMock()
+    mock_writer.close = MagicMock()  # close() should not be async
+    mock_writer.wait_closed = AsyncMock()  # wait_closed() should be async
+    mock_transport = MagicMock()
+    mock_transport.get_extra_info.return_value = [cert_der]
+    mock_writer.transport = mock_transport
+
+    with patch("asyncio.open_connection", return_value=(mock_reader, mock_writer)):
+        with patch("asyncio.wait_for", return_value=(mock_reader, mock_writer)):
+            with patch(
+                "cryptography.x509.load_der_x509_certificate", return_value=cert
+            ):
+                result = await check.execute()
+
+    assert result.status == CheckStatus.FAILURE
+    assert result.details["host"] == "example.com"
+    assert result.details["port"] == 443
+    assert "Certificate is not yet valid" in result.error_message
 
 
 @pytest.mark.asyncio
@@ -50,6 +95,8 @@ async def test_tls_check_multiple_certificates():
     # Simulate multiple certs in the chain
     mock_reader = AsyncMock()
     mock_writer = AsyncMock()
+    mock_writer.close = MagicMock()  # close() should not be async
+    mock_writer.wait_closed = AsyncMock()  # wait_closed() should be async
     mock_transport = MagicMock()
     mock_transport.get_extra_info.return_value = [cert_der, cert_der]
     mock_writer.transport = mock_transport
