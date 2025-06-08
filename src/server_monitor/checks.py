@@ -56,6 +56,7 @@ class HTTPCheck(BaseCheck):
     """HTTP/HTTPS check implementation."""
 
     _shared_client: httpx.AsyncClient | None = None
+    _client_lock = asyncio.Lock()
 
     def __init__(self, config: EndpointConfig) -> None:
         super().__init__(config)
@@ -63,13 +64,27 @@ class HTTPCheck(BaseCheck):
             raise ValueError("HTTP configuration is required for HTTP checks")
         self.http_config: HTTPCheckConfig = config.http
 
-        # Initialize shared client if not already done
-        if not HTTPCheck._shared_client:
-            HTTPCheck._shared_client = httpx.AsyncClient(
-                timeout=self.http_config.timeout,
-                verify=self.http_config.verify_ssl,
-                follow_redirects=self.http_config.follow_redirects,
-            )
+    @classmethod
+    async def get_shared_client(cls) -> httpx.AsyncClient:
+        """Get or create shared HTTP client."""
+        if cls._shared_client is None:
+            async with cls._client_lock:
+                if cls._shared_client is None:
+                    cls._shared_client = httpx.AsyncClient(
+                        timeout=30.0,  # Default timeout
+                        follow_redirects=True,
+                        limits=httpx.Limits(
+                            max_connections=100, max_keepalive_connections=20
+                        ),
+                    )
+        return cls._shared_client
+
+    @classmethod
+    async def close_shared_client(cls) -> None:
+        """Close shared HTTP client."""
+        if cls._shared_client:
+            await cls._shared_client.aclose()
+            cls._shared_client = None
 
     @classmethod
     def reset_shared_client(cls) -> None:
@@ -167,8 +182,15 @@ class HTTPCheck(BaseCheck):
                 },
             )
 
-        except httpx.TimeoutException:
+        except httpx.TimeoutException as e:
             response_time = time.time() - start_time
+            logger.warning(
+                "HTTP timeout",
+                endpoint=self.name,
+                url=self.http_config.url,
+                timeout=self.http_config.timeout,
+                error=str(e),
+            )
             return self._create_result(
                 status=CheckStatus.FAILURE,
                 response_time=response_time,
@@ -176,11 +198,36 @@ class HTTPCheck(BaseCheck):
                 details={
                     "url": self.http_config.url,
                     "timeout": self.http_config.timeout,
+                    "error_type": "TimeoutError",
+                },
+            )
+
+        except httpx.ConnectError as e:
+            response_time = time.time() - start_time
+            logger.warning(
+                "HTTP connection error",
+                endpoint=self.name,
+                url=self.http_config.url,
+                error=str(e),
+            )
+            return self._create_result(
+                status=CheckStatus.FAILURE,
+                response_time=response_time,
+                error_message=f"Connection error: {str(e)}",
+                details={
+                    "url": self.http_config.url,
+                    "error_type": "ConnectionError",
                 },
             )
 
         except httpx.NetworkError as e:
             response_time = time.time() - start_time
+            logger.error(
+                "HTTP network error",
+                endpoint=self.name,
+                url=self.http_config.url,
+                error=str(e),
+            )
             return self._create_result(
                 status=CheckStatus.ERROR,
                 response_time=response_time,

@@ -87,6 +87,4 @@ endpoints:
       port: 443
       timeout: 30
       cert_expiry_warning_days: 30
-    email_notifications:
-      events:
-        - failure
+    # Optional endpoint-specific notifications (inherits from global if not specified)

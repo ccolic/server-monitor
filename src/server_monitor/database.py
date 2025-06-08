@@ -36,7 +36,12 @@ class CheckResult(BaseModel):
     details: dict[str, Any] | None = None
     timestamp: datetime
 
-    model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
+    def model_dump_json(self, **kwargs: Any) -> str:
+        """Custom JSON serialization with datetime handling."""
+        return super().model_dump_json(
+            default=lambda obj: obj.isoformat() if isinstance(obj, datetime) else None,
+            **kwargs,
+        )
 
 
 class DatabaseManager:
@@ -60,15 +65,38 @@ class DatabaseManager:
 
     async def _init_postgresql(self) -> None:
         """Initialize PostgreSQL connection pool."""
-        self._pool = await asyncpg.create_pool(
-            self.config.url, min_size=2, max_size=10, command_timeout=60
-        )
+        try:
+            self._pool = await asyncpg.create_pool(
+                self.config.url,
+                min_size=2,
+                max_size=10,
+                command_timeout=60,
+                server_settings={
+                    "jit": "off"  # Disable JIT for better connection reliability
+                },
+            )
+            logger.info("PostgreSQL connection pool initialized")
+        except Exception as e:
+            logger.error("Failed to initialize PostgreSQL pool", error=str(e))
+            raise
 
     async def _init_sqlite(self) -> None:
         """Initialize SQLite connection."""
-        # For SQLite, we'll use a simple connection for now
-        # In production, consider using aiosqlite with connection pooling
-        pass
+        try:
+            # Create database file if it doesn't exist
+            import aiosqlite
+
+            self._pool = await aiosqlite.connect(
+                self.config.database or "monitor.db", timeout=30.0
+            )
+            # Enable WAL mode for better concurrent access
+            await self._pool.execute("PRAGMA journal_mode=WAL")
+            await self._pool.execute("PRAGMA synchronous=NORMAL")
+            await self._pool.commit()
+            logger.info("SQLite connection initialized", database=self.config.database)
+        except Exception as e:
+            logger.error("Failed to initialize SQLite connection", error=str(e))
+            raise
 
     async def _create_tables(self) -> None:
         """Create database tables."""
@@ -378,7 +406,16 @@ class DatabaseManager:
 
     async def close(self) -> None:
         """Close database connections."""
-        if self.config.type == DatabaseType.POSTGRESQL and self._pool:
-            await self._pool.close()
-
-        logger.info("Database connections closed")
+        try:
+            if self._pool:
+                if self.config.type == DatabaseType.POSTGRESQL:
+                    # Close PostgreSQL pool
+                    await self._pool.close()
+                    logger.info("PostgreSQL connection pool closed")
+                elif self.config.type == DatabaseType.SQLITE:
+                    # Close SQLite connection
+                    await self._pool.close()
+                    logger.info("SQLite connection closed")
+                self._pool = None
+        except Exception as e:
+            logger.error("Error closing database connections", error=str(e))

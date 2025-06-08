@@ -92,8 +92,11 @@ class EndpointMonitor:
         """
         while not self._stop_event.is_set():
             try:
-                # Execute check
-                result = await self.check.execute()
+                # Execute check with metrics tracking
+                from .metrics import metrics
+
+                async with metrics.measure_check(self.config.name):
+                    result = await self.check.execute()
 
                 # Get previous status for notification context
                 previous_status_data = await self.db_manager.get_endpoint_status(

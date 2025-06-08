@@ -73,11 +73,26 @@ def cli() -> None:
 
 @cli.command()
 @click.argument("config_path", type=click.Path(exists=True))
-def start(config_path: str) -> None:
+@click.option(
+    "--validate-only",
+    is_flag=True,
+    help="Only validate configuration, don't start monitoring",
+)
+@click.option(
+    "--health-port", type=int, default=8080, help="Port for health check server"
+)
+def start(config_path: str, validate_only: bool, health_port: int) -> None:
     """Start the monitoring daemon."""
     try:
         # Load configuration
         config = load_config(config_path)
+
+        if validate_only:
+            logger = structlog.get_logger("cli")
+            logger.info("Configuration validation successful", config_path=config_path)
+            console = Console()
+            console.print("✅ Configuration is valid!", style="green")
+            return
 
         # Configure logging
         log_level = config.global_config.log_level
@@ -87,7 +102,11 @@ def start(config_path: str) -> None:
         setup_logging(log_level, log_file, log_max_bytes, log_backup_count)
 
         logger = structlog.get_logger("cli")
-        logger.info("Starting server-monitor daemon", config_path=config_path)
+        logger.info(
+            "Starting server-monitor daemon",
+            config_path=config_path,
+            health_port=health_port,
+        )
 
         # Create and start daemon
         daemon = MonitorDaemon(config)
@@ -264,6 +283,112 @@ def health() -> None:
     except Exception as e:
         click.echo(f"Error: {str(e)}", err=True)
         sys.exit(1)
+
+
+@cli.command()
+@click.argument("config_path", type=click.Path(exists=True))
+def validate(config_path: str) -> None:
+    """Validate configuration file."""
+    console = Console()
+    try:
+        config = load_config(config_path)
+        console.print("✅ Configuration is valid!", style="green")
+
+        # Show summary
+        table = Table(title="Configuration Summary")
+        table.add_column("Setting", style="cyan")
+        table.add_column("Value", style="magenta")
+
+        table.add_row("Endpoints", str(len(config.endpoints)))
+        table.add_row("Database Type", config.global_config.database.type.value)
+        table.add_row("Max Concurrent", str(config.global_config.max_concurrent_checks))
+        table.add_row(
+            "Email Notifications",
+            "Enabled"
+            if config.global_config.email_notifications.enabled
+            else "Disabled",
+        )
+        table.add_row(
+            "Webhook Notifications",
+            "Enabled"
+            if config.global_config.webhook_notifications.enabled
+            else "Disabled",
+        )
+
+        console.print(table)
+
+        # Show endpoints
+        if config.endpoints:
+            endpoint_table = Table(title="Configured Endpoints")
+            endpoint_table.add_column("Name", style="cyan")
+            endpoint_table.add_column("Type", style="green")
+            endpoint_table.add_column("Interval", style="yellow")
+            endpoint_table.add_column("Enabled", style="magenta")
+
+            for endpoint in config.endpoints:
+                endpoint_table.add_row(
+                    endpoint.name,
+                    endpoint.type.value,
+                    f"{endpoint.interval}s",
+                    "✅" if endpoint.enabled else "❌",
+                )
+
+            console.print(endpoint_table)
+
+    except Exception as e:
+        console.print(f"❌ Configuration validation failed: {str(e)}", style="red")
+        sys.exit(1)
+
+
+@cli.command()
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default="table",
+    help="Output format",
+)
+def metrics(output_format: str) -> None:
+    """Show performance metrics."""
+    from .metrics import metrics as perf_metrics
+
+    summary = perf_metrics.get_metrics_summary()
+    console = Console()
+
+    if output_format == "json":
+        console.print_json(data=summary)
+        return
+
+    # Table format
+    table = Table(title="Performance Metrics")
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", style="green")
+
+    table.add_row("Total Endpoints", str(summary["total_endpoints"]))
+    table.add_row("Total Checks", str(summary["total_checks"]))
+    table.add_row("Total Errors", str(summary["total_errors"]))
+    table.add_row("Uptime", f"{summary['uptime']:.1f}s")
+
+    console.print(table)
+
+    if summary["endpoints"]:
+        endpoint_table = Table(title="Endpoint Metrics")
+        endpoint_table.add_column("Endpoint", style="cyan")
+        endpoint_table.add_column("Checks", style="yellow")
+        endpoint_table.add_column("Errors", style="red")
+        endpoint_table.add_column("Success Rate", style="green")
+        endpoint_table.add_column("Avg Response Time", style="blue")
+
+        for name, data in summary["endpoints"].items():
+            endpoint_table.add_row(
+                name,
+                str(data["checks"]),
+                str(data["errors"]),
+                f"{data['success_rate']:.2%}",
+                f"{data['avg_response_time']:.3f}s",
+            )
+
+        console.print(endpoint_table)
 
 
 def main() -> None:
