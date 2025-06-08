@@ -48,7 +48,7 @@ dev = [
     "pytest-mock>=3.12.0",
     "ruff>=0.1.9",
     "mypy>=1.8.0",
-    "pre-commit>=3.5.0,<3.6.0; python_version < '3.9'",
+    "pre-commit>=4.2.0,<4.3.0; python_version < '3.9'",
     "pre-commit>=3.6.0; python_version >= '3.9'",
     "asyncpg-stubs>=0.30.1",
     "types-PyYAML>=6.0.12"
