@@ -23,7 +23,7 @@ pip install server-monitor
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/server-monitor.git
+git clone https://github.com/ccolic/server-monitor.git
 cd server-monitor
 
 # Install the package
@@ -33,7 +33,7 @@ pip install -e .
 ### Using Docker
 
 ```bash
-docker pull ghcr.io/yourusername/server-monitor:latest
+docker pull ghcr.io/ccolic/server-monitor:latest
 ```
 
 ## Configuration
@@ -317,7 +317,7 @@ server-monitor generate-config --output config.yaml
 # Mount your configuration file
 docker run -v $(pwd)/config.yaml:/app/config.yaml \
            -v $(pwd)/data:/app/data \
-           ghcr.io/yourusername/server-monitor:latest
+           ghcr.io/ccolic/server-monitor:latest
 ```
 
 ## Usage Examples
