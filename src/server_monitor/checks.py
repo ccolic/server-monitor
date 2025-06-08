@@ -124,6 +124,15 @@ class HTTPCheck(BaseCheck):
                 expected_status = [expected_status]
 
             if response.status_code not in expected_status:
+                logger.warning(
+                    "HTTP status code mismatch",
+                    endpoint=self.name,
+                    method=self.http_config.method,
+                    url=self.http_config.url,
+                    status_code=response.status_code,
+                    expected_status=self.http_config.expected_status,
+                    response_time_ms=round(response_time * 1000, 2),
+                )
                 return self._create_result(
                     status=CheckStatus.FAILURE,
                     response_time=response_time,
@@ -142,6 +151,15 @@ class HTTPCheck(BaseCheck):
                     content = response.text
                     if self.http_config.content_regex:
                         if not re.search(self.http_config.content_match, content):
+                            logger.warning(
+                                "HTTP content regex mismatch",
+                                endpoint=self.name,
+                                method=self.http_config.method,
+                                url=self.http_config.url,
+                                status_code=response.status_code,
+                                content_match=self.http_config.content_match,
+                                response_time_ms=round(response_time * 1000, 2),
+                            )
                             return self._create_result(
                                 status=CheckStatus.FAILURE,
                                 response_time=response_time,
@@ -155,6 +173,15 @@ class HTTPCheck(BaseCheck):
                             )
                     else:
                         if self.http_config.content_match not in content:
+                            logger.warning(
+                                "HTTP content mismatch",
+                                endpoint=self.name,
+                                method=self.http_config.method,
+                                url=self.http_config.url,
+                                status_code=response.status_code,
+                                content_match=self.http_config.content_match,
+                                response_time_ms=round(response_time * 1000, 2),
+                            )
                             return self._create_result(
                                 status=CheckStatus.FAILURE,
                                 response_time=response_time,
@@ -168,6 +195,14 @@ class HTTPCheck(BaseCheck):
                             )
                 except re.error as e:
                     response_time = time.time() - start_time
+                    logger.error(
+                        "HTTP regex pattern error",
+                        endpoint=self.name,
+                        url=self.http_config.url,
+                        content_match=self.http_config.content_match,
+                        error=str(e),
+                        response_time_ms=round(response_time * 1000, 2),
+                    )
                     return self._create_result(
                         status=CheckStatus.ERROR,
                         response_time=response_time,
@@ -207,8 +242,10 @@ class HTTPCheck(BaseCheck):
             logger.warning(
                 "HTTP timeout",
                 endpoint=self.name,
+                method=self.http_config.method,
                 url=self.http_config.url,
                 timeout=self.http_config.timeout,
+                response_time_ms=round(response_time * 1000, 2),
                 error=str(e),
             )
             return self._create_result(
@@ -227,7 +264,9 @@ class HTTPCheck(BaseCheck):
             logger.warning(
                 "HTTP connection error",
                 endpoint=self.name,
+                method=self.http_config.method,
                 url=self.http_config.url,
+                response_time_ms=round(response_time * 1000, 2),
                 error=str(e),
             )
             return self._create_result(
@@ -245,7 +284,9 @@ class HTTPCheck(BaseCheck):
             logger.error(
                 "HTTP network error",
                 endpoint=self.name,
+                method=self.http_config.method,
                 url=self.http_config.url,
+                response_time_ms=round(response_time * 1000, 2),
                 error=str(e),
             )
             return self._create_result(
@@ -257,6 +298,15 @@ class HTTPCheck(BaseCheck):
 
         except Exception as e:
             response_time = time.time() - start_time
+            logger.error(
+                "HTTP general error",
+                endpoint=self.name,
+                method=self.http_config.method,
+                url=self.http_config.url,
+                response_time_ms=round(response_time * 1000, 2),
+                error_type=type(e).__name__,
+                error=str(e),
+            )
             return self._create_result(
                 status=CheckStatus.ERROR,
                 response_time=response_time,
@@ -313,6 +363,14 @@ class TCPCheck(BaseCheck):
 
         except TimeoutError:
             response_time = time.time() - start_time
+            logger.warning(
+                "TCP connection timeout",
+                endpoint=self.name,
+                host=self.tcp_config.host,
+                port=self.tcp_config.port,
+                timeout=self.tcp_config.timeout,
+                response_time_ms=round(response_time * 1000, 2),
+            )
             return self._create_result(
                 status=CheckStatus.FAILURE,
                 response_time=response_time,
@@ -326,6 +384,15 @@ class TCPCheck(BaseCheck):
 
         except Exception as e:
             response_time = time.time() - start_time
+            logger.error(
+                "TCP connection error",
+                endpoint=self.name,
+                host=self.tcp_config.host,
+                port=self.tcp_config.port,
+                response_time_ms=round(response_time * 1000, 2),
+                error_type=type(e).__name__,
+                error=str(e),
+            )
             return self._create_result(
                 status=CheckStatus.ERROR,
                 response_time=response_time,
@@ -392,6 +459,16 @@ class TLSCheck(BaseCheck):
 
                     # Check if certificate is valid
                     if now < not_valid_before:
+                        logger.warning(
+                            "TLS certificate not yet valid",
+                            endpoint=self.name,
+                            host=self.tls_config.host,
+                            port=self.tls_config.port,
+                            not_valid_before=not_valid_before.isoformat(),
+                            not_valid_after=not_valid_after.isoformat(),
+                            days_until_expiry=days_until_expiry,
+                            response_time_ms=round(response_time * 1000, 2),
+                        )
                         return self._create_result(
                             status=CheckStatus.FAILURE,
                             response_time=response_time,
@@ -406,6 +483,16 @@ class TLSCheck(BaseCheck):
                         )
 
                     if now > not_valid_after:
+                        logger.warning(
+                            "TLS certificate expired",
+                            endpoint=self.name,
+                            host=self.tls_config.host,
+                            port=self.tls_config.port,
+                            not_valid_before=not_valid_before.isoformat(),
+                            not_valid_after=not_valid_after.isoformat(),
+                            days_until_expiry=days_until_expiry,
+                            response_time_ms=round(response_time * 1000, 2),
+                        )
                         return self._create_result(
                             status=CheckStatus.FAILURE,
                             response_time=response_time,
@@ -421,6 +508,17 @@ class TLSCheck(BaseCheck):
 
                     # Check if certificate expires soon
                     if days_until_expiry <= self.tls_config.cert_expiry_warning_days:
+                        logger.warning(
+                            "TLS certificate expiring soon",
+                            endpoint=self.name,
+                            host=self.tls_config.host,
+                            port=self.tls_config.port,
+                            not_valid_before=not_valid_before.isoformat(),
+                            not_valid_after=not_valid_after.isoformat(),
+                            days_until_expiry=days_until_expiry,
+                            warning_threshold=self.tls_config.cert_expiry_warning_days,
+                            response_time_ms=round(response_time * 1000, 2),
+                        )
                         return self._create_result(
                             status=CheckStatus.FAILURE,
                             response_time=response_time,
@@ -466,6 +564,14 @@ class TLSCheck(BaseCheck):
                     writer.close()
                     await writer.wait_closed()
 
+                    logger.error(
+                        "TLS certificate retrieval failed",
+                        endpoint=self.name,
+                        host=self.tls_config.host,
+                        port=self.tls_config.port,
+                        response_time_ms=round(response_time * 1000, 2),
+                        error="Unable to retrieve certificate from connection",
+                    )
                     return self._create_result(
                         status=CheckStatus.ERROR,
                         response_time=response_time,
@@ -480,6 +586,14 @@ class TLSCheck(BaseCheck):
                 writer.close()
                 await writer.wait_closed()
 
+                logger.error(
+                    "TLS transport access failed",
+                    endpoint=self.name,
+                    host=self.tls_config.host,
+                    port=self.tls_config.port,
+                    response_time_ms=round(response_time * 1000, 2),
+                    error="Unable to access SSL transport information",
+                )
                 return self._create_result(
                     status=CheckStatus.ERROR,
                     response_time=response_time,
@@ -492,6 +606,14 @@ class TLSCheck(BaseCheck):
 
         except TimeoutError:
             response_time = time.time() - start_time
+            logger.warning(
+                "TLS connection timeout",
+                endpoint=self.name,
+                host=self.tls_config.host,
+                port=self.tls_config.port,
+                timeout=self.tls_config.timeout,
+                response_time_ms=round(response_time * 1000, 2),
+            )
             return self._create_result(
                 status=CheckStatus.FAILURE,
                 response_time=response_time,
@@ -505,6 +627,14 @@ class TLSCheck(BaseCheck):
 
         except ssl.SSLError as e:
             response_time = time.time() - start_time
+            logger.warning(
+                "TLS SSL error",
+                endpoint=self.name,
+                host=self.tls_config.host,
+                port=self.tls_config.port,
+                response_time_ms=round(response_time * 1000, 2),
+                error=str(e),
+            )
             return self._create_result(
                 status=CheckStatus.FAILURE,
                 response_time=response_time,
@@ -518,6 +648,15 @@ class TLSCheck(BaseCheck):
 
         except Exception as e:
             response_time = time.time() - start_time
+            logger.error(
+                "TLS general error",
+                endpoint=self.name,
+                host=self.tls_config.host,
+                port=self.tls_config.port,
+                response_time_ms=round(response_time * 1000, 2),
+                error_type=type(e).__name__,
+                error=str(e),
+            )
             return self._create_result(
                 status=CheckStatus.ERROR,
                 response_time=response_time,
