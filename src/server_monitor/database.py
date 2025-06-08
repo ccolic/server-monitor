@@ -36,13 +36,6 @@ class CheckResult(BaseModel):
     details: dict[str, Any] | None = None
     timestamp: datetime
 
-    def model_dump_json(self, **kwargs: Any) -> str:
-        """Custom JSON serialization with datetime handling."""
-        return super().model_dump_json(
-            default=lambda obj: obj.isoformat() if isinstance(obj, datetime) else None,
-            **kwargs,
-        )
-
 
 class DatabaseManager:
     """Database manager for storing check results."""

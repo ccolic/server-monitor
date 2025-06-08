@@ -305,13 +305,15 @@ def validate(config_path: str) -> None:
         table.add_row(
             "Email Notifications",
             "Enabled"
-            if config.global_config.email_notifications.enabled
+            if config.global_config.email_notifications
+            and config.global_config.email_notifications.enabled
             else "Disabled",
         )
         table.add_row(
             "Webhook Notifications",
             "Enabled"
-            if config.global_config.webhook_notifications.enabled
+            if config.global_config.webhook_notifications
+            and config.global_config.webhook_notifications.enabled
             else "Disabled",
         )
 
