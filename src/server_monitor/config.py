@@ -255,7 +255,27 @@ class MonitorConfig(BaseModel):
                 data["global"]["email_notifications"]["smtp"].get("password"),
             )
 
+        # Validate configuration structure
+        cls.validate_config_structure(data)
+
         return cls(**data)
+
+    @staticmethod
+    def validate_config_structure(data: dict) -> None:
+        """Validate the structure and values of the configuration."""
+        if "global" not in data:
+            raise ValueError("Missing 'global' section in configuration.")
+
+        if "endpoints" not in data or not isinstance(data["endpoints"], list):
+            raise ValueError("'endpoints' section must be a list.")
+
+        for endpoint in data["endpoints"]:
+            if "name" not in endpoint or not endpoint["name"]:
+                raise ValueError("Each endpoint must have a 'name'.")
+            if "type" not in endpoint or endpoint["type"] not in ["http", "tcp", "tls"]:
+                raise ValueError(
+                    "Invalid 'type' for endpoint: must be 'http', 'tcp', or 'tls'."
+                )
 
     def to_yaml(self, file_path: str | Path) -> None:
         """Save configuration to YAML file."""
