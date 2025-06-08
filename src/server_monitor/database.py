@@ -183,7 +183,11 @@ class DatabaseManager:
         """
 
         # Use existing connection for in-memory databases, create new one for file databases
-        if database_path == ":memory:" and self._pool:
+        if (
+            database_path == ":memory:"
+            and self._pool
+            and isinstance(self._pool, aiosqlite.Connection)
+        ):
             await self._pool.executescript(create_table_sql)
             await self._pool.commit()
         else:
@@ -254,7 +258,11 @@ class DatabaseManager:
         )
 
         # Use existing connection for in-memory databases, create new one for file databases
-        if database_path == ":memory:" and self._pool:
+        if (
+            database_path == ":memory:"
+            and self._pool
+            and isinstance(self._pool, aiosqlite.Connection)
+        ):
             await self._pool.execute(
                 insert_sql,
                 (
@@ -353,7 +361,11 @@ class DatabaseManager:
         """
 
         # Use existing connection for in-memory databases, create new one for file databases
-        if database_path == ":memory:" and self._pool:
+        if (
+            database_path == ":memory:"
+            and self._pool
+            and isinstance(self._pool, aiosqlite.Connection)
+        ):
             await self._pool.execute(
                 upsert_sql,
                 (
@@ -437,7 +449,11 @@ class DatabaseManager:
         """
 
         # Use existing connection for in-memory databases, create new one for file databases
-        if database_path == ":memory:" and self._pool:
+        if (
+            database_path == ":memory:"
+            and self._pool
+            and isinstance(self._pool, aiosqlite.Connection)
+        ):
             self._pool.row_factory = aiosqlite.Row
             async with self._pool.execute(select_sql, (endpoint_name,)) as cursor:
                 row = await cursor.fetchone()
