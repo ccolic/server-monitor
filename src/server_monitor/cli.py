@@ -56,6 +56,10 @@ def setup_logging(
         handlers=log_handlers,
     )
 
+    # Disable httpx internal logging to prevent unwanted output
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
     # Configure structlog
     structlog.configure(
         processors=processors,

@@ -179,7 +179,7 @@ class HTTPCheck(BaseCheck):
                         },
                     )
 
-            return self._create_result(
+            result = self._create_result(
                 status=CheckStatus.SUCCESS,
                 response_time=response_time,
                 details={
@@ -189,6 +189,18 @@ class HTTPCheck(BaseCheck):
                     "content_length": len(response.content),
                 },
             )
+
+            # Log successful HTTP request
+            logger.info(
+                "HTTP check completed",
+                endpoint=self.name,
+                method=self.http_config.method,
+                url=self.http_config.url,
+                status_code=response.status_code,
+                response_time_ms=round(response_time * 1000, 2),
+            )
+
+            return result
 
         except httpx.TimeoutException as e:
             response_time = time.time() - start_time
@@ -282,11 +294,22 @@ class TCPCheck(BaseCheck):
             writer.close()
             await writer.wait_closed()
 
-            return self._create_result(
+            result = self._create_result(
                 status=CheckStatus.SUCCESS,
                 response_time=response_time,
                 details={"host": self.tcp_config.host, "port": self.tcp_config.port},
             )
+
+            # Log successful TCP connection
+            logger.info(
+                "TCP check completed",
+                endpoint=self.name,
+                host=self.tcp_config.host,
+                port=self.tcp_config.port,
+                response_time_ms=round(response_time * 1000, 2),
+            )
+
+            return result
 
         except TimeoutError:
             response_time = time.time() - start_time
@@ -413,7 +436,7 @@ class TLSCheck(BaseCheck):
                         )
 
                     # Certificate is valid
-                    return self._create_result(
+                    result = self._create_result(
                         status=CheckStatus.SUCCESS,
                         response_time=response_time,
                         details={
@@ -426,6 +449,18 @@ class TLSCheck(BaseCheck):
                             "issuer": cert.issuer.rfc4514_string(),
                         },
                     )
+
+                    # Log successful TLS check
+                    logger.info(
+                        "TLS check completed",
+                        endpoint=self.name,
+                        host=self.tls_config.host,
+                        port=self.tls_config.port,
+                        days_until_expiry=days_until_expiry,
+                        response_time_ms=round(response_time * 1000, 2),
+                    )
+
+                    return result
                 else:
                     # Close connection
                     writer.close()
