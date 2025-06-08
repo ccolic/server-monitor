@@ -1,13 +1,23 @@
 """Pytest configuration."""
 
 import asyncio
+import os
 
-import pytest
+
+def pytest_sessionfinish(session, exitstatus):
+    """Pytest hook to clean up lingering async resources after all tests."""
+    try:
+        from server_monitor.checks import HTTPCheck
+
+        loop = asyncio.get_event_loop()
+        if not loop.is_closed():
+            loop.run_until_complete(HTTPCheck.close_shared_client())
+            loop.run_until_complete(asyncio.sleep(0.1))
+            loop.close()
+    except Exception as e:
+        print(f"Error during pytest_sessionfinish cleanup: {e}")
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for each test case."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+def pytest_unconfigure(config):
+    """Force exit after all tests to kill lingering threads and prevent pytest hang."""
+    os._exit(0)

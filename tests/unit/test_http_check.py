@@ -31,6 +31,7 @@ async def test_http_check_content_match_plain_text():
     mock_response.content = b"Example Domain"
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value.request.return_value = mock_response
+    mock_client.__aexit__.return_value = None  # Ensure context manager exit is awaited
     with patch("httpx.AsyncClient", return_value=mock_client):
         result = await check.execute()
     assert result.status == CheckStatus.SUCCESS
@@ -60,6 +61,7 @@ async def test_http_check_unexpected_status_and_content():
     mock_response.content = b"Server Error"
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value.request.return_value = mock_response
+    mock_client.__aexit__.return_value = None
     with patch("httpx.AsyncClient", return_value=mock_client):
         result = await check.execute()
     assert result.status == CheckStatus.FAILURE
@@ -93,6 +95,7 @@ async def test_http_check_invalid_regex():
     mock_response.content = b"Example Domain"
     mock_client = AsyncMock()
     mock_client.__aenter__.return_value.request.return_value = mock_response
+    mock_client.__aexit__.return_value = None
     with patch("httpx.AsyncClient", return_value=mock_client):
         result = await check.execute()
     assert result.status == CheckStatus.ERROR
@@ -117,6 +120,7 @@ async def test_http_check_network_error():
     check = HTTPCheck(config)
     mock_client = AsyncMock()
     mock_client.__aenter__.side_effect = httpx.NetworkError("network down")
+    mock_client.__aexit__.return_value = None
     with patch("httpx.AsyncClient", return_value=mock_client):
         result = await check.execute()
     assert result.status == CheckStatus.ERROR

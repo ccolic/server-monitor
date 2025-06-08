@@ -47,6 +47,7 @@ async def test_tls_check_not_yet_valid():
     mock_writer = AsyncMock()
     mock_writer.close = MagicMock()  # close() should not be async
     mock_writer.wait_closed = AsyncMock()  # wait_closed() should be async
+    mock_writer.wait_closed.return_value = None  # Ensure wait_closed is awaited
     mock_transport = MagicMock()
     mock_transport.get_extra_info.return_value = [cert_der]
     mock_writer.transport = mock_transport
@@ -97,6 +98,7 @@ async def test_tls_check_multiple_certificates():
     mock_writer = AsyncMock()
     mock_writer.close = MagicMock()  # close() should not be async
     mock_writer.wait_closed = AsyncMock()  # wait_closed() should be async
+    mock_writer.wait_closed.return_value = None  # Ensure wait_closed is awaited
     mock_transport = MagicMock()
     mock_transport.get_extra_info.return_value = [cert_der, cert_der]
     mock_writer.transport = mock_transport

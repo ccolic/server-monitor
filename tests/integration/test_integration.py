@@ -78,6 +78,21 @@ async def test_daemon_lifecycle(temp_config_file):
         await asyncio.wait_for(start_task, timeout=1.0)
     except TimeoutError:
         start_task.cancel()
+        try:
+            await start_task
+        except asyncio.CancelledError:
+            pass
+    finally:
+        Path(temp_config_file).unlink(missing_ok=True)
+        # Ensure shared HTTP client is closed to avoid lock hangs
+        from server_monitor.checks import HTTPCheck
+
+        await HTTPCheck.close_shared_client()
+        # Explicitly close the database connection if possible
+        try:
+            await daemon.db_manager.close()
+        except Exception as e:
+            print(f"Database close error: {e}")
 
 
 @pytest.mark.asyncio
@@ -119,6 +134,14 @@ async def test_config_reload(temp_config_file):
     finally:
         # Ensure daemon is properly stopped
         await daemon.stop()
+        Path(temp_config_file).unlink(missing_ok=True)
+        from server_monitor.checks import HTTPCheck
+
+        await HTTPCheck.close_shared_client()
+        try:
+            await daemon.db_manager.close()
+        except Exception as e:
+            print(f"Database close error: {e}")
 
 
 @pytest.mark.asyncio
@@ -181,9 +204,22 @@ async def test_metrics_collection():
             await asyncio.wait_for(start_task, timeout=1.0)
         except TimeoutError:
             start_task.cancel()
+            try:
+                await start_task
+            except asyncio.CancelledError:
+                pass
 
     finally:
         Path(temp_path).unlink(missing_ok=True)
+        # Ensure shared HTTP client is closed to avoid lock hangs
+        from server_monitor.checks import HTTPCheck
+
+        await HTTPCheck.close_shared_client()
+        # Explicitly close the database connection if possible
+        try:
+            await daemon.db_manager.close()
+        except Exception as e:
+            print(f"Database close error: {e}")
 
 
 @pytest.mark.asyncio
@@ -246,6 +282,19 @@ async def test_error_handling():
             await asyncio.wait_for(start_task, timeout=1.0)
         except TimeoutError:
             start_task.cancel()
+            try:
+                await start_task
+            except asyncio.CancelledError:
+                pass
 
     finally:
         Path(temp_path).unlink(missing_ok=True)
+        # Ensure shared HTTP client is closed to avoid lock hangs
+        from server_monitor.checks import HTTPCheck
+
+        await HTTPCheck.close_shared_client()
+        # Explicitly close the database connection if possible
+        try:
+            await daemon.db_manager.close()
+        except Exception as e:
+            print(f"Database close error: {e}")
