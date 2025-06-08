@@ -195,10 +195,9 @@ async def test_metrics_collection():
         await daemon.stop()
 
         # Check metrics were collected
-        summary = metrics.get_metrics_summary()
-        assert summary["total_endpoints"] >= 1
-        assert summary["total_checks"] >= 1
-        assert "Metrics Test" in summary["endpoints"]
+        assert len(metrics.check_counts) >= 1
+        assert sum(metrics.check_counts.values()) >= 1
+        assert "Metrics Test" in metrics.check_counts
 
         try:
             await asyncio.wait_for(start_task, timeout=1.0)
@@ -270,13 +269,11 @@ async def test_error_handling():
         # Verify error metrics were recorded
         from server_monitor.metrics import metrics
 
-        summary = metrics.get_metrics_summary()
-        if "Failing Test" in summary["endpoints"]:
-            endpoint_metrics = summary["endpoints"]["Failing Test"]
+        if "Failing Test" in metrics.check_counts:
             # Should have recorded some errors or low success rate
-            assert (
-                endpoint_metrics["success_rate"] < 1.0 or endpoint_metrics["errors"] > 0
-            )
+            success_rate = metrics.get_success_rate("Failing Test")
+            errors = metrics.error_counts.get("Failing Test", 0)
+            assert success_rate < 1.0 or errors > 0
 
         try:
             await asyncio.wait_for(start_task, timeout=1.0)

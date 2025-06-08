@@ -54,32 +54,6 @@ def test_success_rate():
     assert abs(success_rate - 0.6667) < 0.001
 
 
-def test_metrics_summary():
-    """Test metrics summary generation."""
-    metrics = PerformanceMetrics()
-
-    # Add some test data
-    metrics.record_check_time("endpoint1", 1.0)
-    metrics.record_check_time("endpoint1", 2.0)
-    metrics.record_error("endpoint1")
-
-    metrics.record_check_time("endpoint2", 0.5)
-
-    summary = metrics.get_metrics_summary()
-
-    assert summary["total_endpoints"] == 2
-    assert summary["total_checks"] == 3
-    assert summary["total_errors"] == 1
-    assert "endpoint1" in summary["endpoints"]
-    assert "endpoint2" in summary["endpoints"]
-
-    endpoint1_data = summary["endpoints"]["endpoint1"]
-    assert endpoint1_data["checks"] == 2
-    assert endpoint1_data["errors"] == 1
-    assert endpoint1_data["avg_response_time"] == 1.5
-    assert endpoint1_data["success_rate"] == 0.5
-
-
 def test_reset_metrics():
     """Test metrics reset."""
     metrics = PerformanceMetrics()

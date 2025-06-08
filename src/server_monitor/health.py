@@ -19,7 +19,6 @@ class HealthCheckServer:
         """Set up HTTP routes."""
         self.app.router.add_get("/health", self.health_check)
         self.app.router.add_get("/metrics", self.get_prometheus_metrics)
-        self.app.router.add_get("/metrics/json", self.get_json_metrics)
         self.app.router.add_get("/status", self.get_status)
 
     async def health_check(self, request: web.Request) -> web.Response:
@@ -27,10 +26,6 @@ class HealthCheckServer:
         return web.json_response(
             {"status": "healthy", "timestamp": metrics.last_reset.isoformat()}
         )
-
-    async def get_json_metrics(self, request: web.Request) -> web.Response:
-        """Get performance metrics in JSON format."""
-        return web.json_response(metrics.get_metrics_summary())
 
     async def get_prometheus_metrics(self, request: web.Request) -> web.Response:
         """Get performance metrics in Prometheus format."""
@@ -47,7 +42,6 @@ class HealthCheckServer:
         status = {
             "daemon": {"running": True},
             "endpoints": {},
-            "metrics": metrics.get_metrics_summary(),
         }
         return web.json_response(status)
 

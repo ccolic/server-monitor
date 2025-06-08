@@ -235,12 +235,11 @@ scrape_configs:
 
 ### CLI Metrics
 
-View metrics from the command line:
+View metrics from the command line in Prometheus format:
 
 ```bash
-# Prometheus format (default)
+# Display Prometheus metrics
 server-monitor metrics
-
 ```
 
 ## Check Types

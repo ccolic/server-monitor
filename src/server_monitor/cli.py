@@ -337,60 +337,13 @@ def validate(config_path: str) -> None:
 
 
 @cli.command()
-@click.option(
-    "--format",
-    "output_format",
-    type=click.Choice(["table", "json", "prometheus"]),
-    default="prometheus",
-    help="Output format",
-)
-def metrics(output_format: str) -> None:
-    """Show performance metrics."""
+def metrics() -> None:
+    """Show performance metrics in Prometheus format."""
     from .metrics import metrics as perf_metrics
 
     console = Console()
-
-    if output_format == "prometheus":
-        prometheus_output = perf_metrics.get_prometheus_metrics()
-        console.print(prometheus_output)
-        return
-
-    summary = perf_metrics.get_metrics_summary()
-
-    if output_format == "json":
-        console.print_json(data=summary)
-        return
-
-    # Table format
-    table = Table(title="Performance Metrics")
-    table.add_column("Metric", style="cyan")
-    table.add_column("Value", style="green")
-
-    table.add_row("Total Endpoints", str(summary["total_endpoints"]))
-    table.add_row("Total Checks", str(summary["total_checks"]))
-    table.add_row("Total Errors", str(summary["total_errors"]))
-    table.add_row("Uptime", f"{summary['uptime']:.1f}s")
-
-    console.print(table)
-
-    if summary["endpoints"]:
-        endpoint_table = Table(title="Endpoint Metrics")
-        endpoint_table.add_column("Endpoint", style="cyan")
-        endpoint_table.add_column("Checks", style="yellow")
-        endpoint_table.add_column("Errors", style="red")
-        endpoint_table.add_column("Success Rate", style="green")
-        endpoint_table.add_column("Avg Response Time", style="blue")
-
-        for name, data in summary["endpoints"].items():
-            endpoint_table.add_row(
-                name,
-                str(data["checks"]),
-                str(data["errors"]),
-                f"{data['success_rate']:.2%}",
-                f"{data['avg_response_time']:.3f}s",
-            )
-
-        console.print(endpoint_table)
+    prometheus_output = perf_metrics.get_prometheus_metrics()
+    console.print(prometheus_output)
 
 
 def main() -> None:

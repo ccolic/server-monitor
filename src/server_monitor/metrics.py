@@ -7,7 +7,6 @@ from collections import defaultdict, deque
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Any
 
 import structlog
 from prometheus_client import (
@@ -153,28 +152,6 @@ class PerformanceMetrics:
         if total_checks == 0:
             return 1.0
         return (total_checks - errors) / total_checks
-
-    def get_metrics_summary(self) -> dict[str, Any]:
-        """Get a summary of all metrics."""
-        endpoints: dict[str, dict[str, Any]] = {}
-
-        for endpoint in self.check_counts:
-            endpoints[endpoint] = {
-                "checks": self.check_counts[endpoint],
-                "errors": self.error_counts[endpoint],
-                "avg_response_time": self.get_avg_response_time(endpoint),
-                "success_rate": self.get_success_rate(endpoint),
-            }
-
-        summary = {
-            "total_endpoints": len(self.check_counts),
-            "total_checks": sum(self.check_counts.values()),
-            "total_errors": sum(self.error_counts.values()),
-            "uptime": (datetime.now() - self.last_reset).total_seconds(),
-            "endpoints": endpoints,
-        }
-
-        return summary
 
     def get_prometheus_metrics(self) -> str:
         """Get metrics in Prometheus format."""

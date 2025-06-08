@@ -42,24 +42,6 @@ async def test_prometheus_metrics_endpoint():
 
 
 @pytest.mark.asyncio
-async def test_json_metrics_endpoint():
-    """Test the JSON metrics endpoint."""
-    # Add some test data
-    metrics.record_check_time("test_endpoint", 0.5, True)
-    metrics.record_error("test_endpoint")
-
-    server = HealthCheckServer(8081)
-
-    class MockRequest:
-        def __init__(self):
-            pass
-
-    response = await server.get_json_metrics(MockRequest())
-    assert response.status == 200
-    assert response.content_type == "application/json"
-
-
-@pytest.mark.asyncio
 async def test_status_endpoint():
     """Test the status endpoint."""
     server = HealthCheckServer(8081)
