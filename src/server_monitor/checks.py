@@ -8,10 +8,13 @@ import ssl
 import time
 from abc import ABC, abstractmethod
 
+# Try to import UTC from datetime (Python 3.11+), else fallback to datetime.UTC
 try:
     from datetime import UTC
 except ImportError:
-    UTC = UTC
+    from datetime import timezone
+
+    UTC = timezone.UTC
 from datetime import datetime
 from typing import Any
 
