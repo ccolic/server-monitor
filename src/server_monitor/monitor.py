@@ -189,6 +189,9 @@ class MonitorDaemon:
         # Initialize database
         await self.db_manager.initialize()
 
+        # Set daemon reference in health server so it can get real status
+        self.health_server.set_daemon(self)
+
         # Create endpoint monitors
         for endpoint_config in self.config.endpoints:
             if endpoint_config.enabled:

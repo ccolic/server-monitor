@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from aiohttp import web
 
 from .metrics import metrics
+
+if TYPE_CHECKING:
+    from .monitor import MonitorDaemon
 
 
 class HealthCheckServer:
@@ -13,7 +18,12 @@ class HealthCheckServer:
     def __init__(self, port: int = 8080) -> None:
         self.port = port
         self.app = web.Application()
+        self._daemon: MonitorDaemon | None = None
         self._setup_routes()
+
+    def set_daemon(self, daemon: MonitorDaemon) -> None:
+        """Set the daemon reference for status endpoint."""
+        self._daemon = daemon
 
     def _setup_routes(self) -> None:
         """Set up HTTP routes."""
@@ -38,11 +48,21 @@ class HealthCheckServer:
 
     async def get_status(self, request: web.Request) -> web.Response:
         """Get detailed status information."""
-        # This would be populated by the daemon
-        status = {
-            "daemon": {"running": True},
-            "endpoints": {},
-        }
+        if self._daemon:
+            try:
+                status = await self._daemon.get_status()
+            except Exception as e:
+                # Fallback if daemon status fails
+                status = {
+                    "daemon": {"running": True, "error": str(e)},
+                    "endpoints": {},
+                }
+        else:
+            # Default status when daemon is not set
+            status = {
+                "daemon": {"running": True},
+                "endpoints": {},
+            }
         return web.json_response(status)
 
     async def start(self) -> None:
