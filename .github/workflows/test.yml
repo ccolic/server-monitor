@@ -34,7 +34,11 @@ jobs:
 
     - name: Type check with mypy
       run: |
-        mypy src/
+        if [[ "$PYTHON_VERSION" == 3.11* || "$PYTHON_VERSION" == 3.12* || "$PYTHON_VERSION" == 3.13* ]]; then
+          mypy src/ --disable-error-code=unused-ignore
+        else
+          mypy src/
+        fi
 
     - name: Test with pytest
       run: |

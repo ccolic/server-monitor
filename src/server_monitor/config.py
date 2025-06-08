@@ -262,6 +262,9 @@ class MonitorConfig(BaseModel):
     global_config: GlobalConfig = Field(alias="global")
     endpoints: list[EndpointConfig]
 
+    # The following 'type: ignore' is required for mypy compatibility with Python 3.8,
+    # where TypedDict does not allow extra keys. It is safe to ignore the 'unused-ignore'
+    # warning in Python 3.11+.
     model_config = {
         "validate_by_name": True,  # type: ignore
     }
