@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field, model_validator
@@ -263,7 +264,7 @@ class MonitorConfig(BaseModel):
         return cls(**data)
 
     @staticmethod
-    def validate_config_structure(data: dict) -> None:
+    def validate_config_structure(data: dict[str, Any]) -> None:
         """Validate the structure and values of the configuration."""
         if "global" not in data:
             raise ValueError("Missing 'global' section in configuration.")
