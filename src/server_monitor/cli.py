@@ -9,6 +9,7 @@ import logging
 import sys
 from collections.abc import Callable, Mapping, MutableMapping
 from logging import Handler
+from logging.handlers import RotatingFileHandler
 from typing import Any
 
 import click
@@ -32,7 +33,7 @@ def setup_logging(
     log_handlers: list[Handler] = [logging.StreamHandler()]
     if log_file:
         log_handlers.append(
-            logging.handlers.RotatingFileHandler(
+            RotatingFileHandler(
                 log_file, maxBytes=log_max_bytes, backupCount=log_backup_count
             )
         )
