@@ -286,7 +286,6 @@ endpoints:
 
 To securely store sensitive information, set the following environment variables:
 
-- `SMTP_USERNAME`: Your SMTP username.
 - `SMTP_PASSWORD`: Your SMTP password.
 
 These variables will override the values in `config.yaml`.
@@ -331,15 +330,8 @@ server-monitor start config.yaml
 ### Check Status
 
 ```bash
+server-monitor status config.yaml
 server-monitor status config.yaml --output json
-```
-
-### Health Check
-
-The health check endpoint is used for Docker container monitoring. It returns "OK" if the application is running correctly.
-
-```bash
-server-monitor health
 ```
 
 ## Metrics and Monitoring
@@ -378,15 +370,6 @@ scrape_configs:
       - targets: ['localhost:8080']
     scrape_interval: 30s
     metrics_path: /metrics
-```
-
-### CLI Metrics
-
-View metrics from the command line in Prometheus format:
-
-```bash
-# Display Prometheus metrics
-server-monitor metrics
 ```
 
 ## Check Types
