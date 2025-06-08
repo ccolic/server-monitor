@@ -45,7 +45,7 @@ class HealthCheckServer:
         """Start the health check server."""
         self.runner = web.AppRunner(self.app)
         await self.runner.setup()
-        site = web.TCPSite(self.runner, "localhost", self.port)
+        site = web.TCPSite(self.runner, "0.0.0.0", self.port)
         await site.start()
 
     async def stop(self) -> None:

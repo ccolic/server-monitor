@@ -1,5 +1,4 @@
-# Stage 1: Builder
-FROM python:3.11-slim AS builder
+FROM python:3.11-slim
 
 # Set up environment
 ENV PYTHONFAULTHANDLER=1 \
@@ -8,61 +7,40 @@ ENV PYTHONFAULTHANDLER=1 \
     PIP_NO_CACHE_DIR=off \
     PIP_DISABLE_PIP_VERSION_CHECK=on \
     PIP_DEFAULT_TIMEOUT=100 \
-    PYTHONPATH=${PYTHONPATH}:/app
+    PYTHONPATH=/app/src
 
-# Install build dependencies
+# Install dependencies
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         gcc \
         libpq-dev \
+        libpq5 \
+        curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up working directory
 WORKDIR /app
 
-# Copy only requirements first, to leverage Docker caching
-COPY pyproject.toml ./
-
-# Install dependencies
-RUN pip install --no-cache-dir -e .
-
-# Stage 2: Final Image
-FROM python:3.11-alpine
-
-# Set up environment
-ENV PYTHONFAULTHANDLER=1 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONHASHSEED=random \
-    PYTHONPATH=${PYTHONPATH}:/app
-
-# Install runtime dependencies
-RUN apk add --no-cache \
-        ca-certificates \
-        libpq \
-        curl
-
-# Set up working directory
-WORKDIR /app
-
-# Copy compiled dependencies from builder stage
-COPY --from=builder /app /app
-
-# Copy source code
+# Copy source code and requirements
+COPY pyproject.toml README.md ./
 COPY src/ /app/src/
+
+# Install the package
+RUN pip install --no-cache-dir -e .
 
 # Copy config example
 COPY config.yaml.example /app/config.yaml
 
 # Create user
-RUN addgroup -S monitor && adduser -S monitor -G monitor
+RUN addgroup --system monitor && adduser --system --group monitor
 RUN chown -R monitor:monitor /app
 USER monitor
 
 # Set entrypoint
 ENTRYPOINT ["python", "-m", "server_monitor.cli"]
-CMD ["start", "/app/config.yaml"]
+CMD ["start", "/app/config.yaml", "--health-port", "8081"]
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD curl -f http://localhost:8081/health || exit 1
