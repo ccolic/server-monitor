@@ -19,7 +19,20 @@ logger = structlog.get_logger(__name__)
 
 
 class EndpointMonitor:
-    """Monitor for a single endpoint."""
+    """Monitor for a single endpoint.
+
+    This class handles the monitoring of a single endpoint, including executing checks,
+    storing results in the database, and sending notifications based on the check results.
+
+    Attributes:
+        config (EndpointConfig): Configuration for the endpoint.
+        db_manager (DatabaseManager): Database manager for storing check results.
+        global_config (MonitorConfig): Global configuration for the monitor.
+        check: The check instance for the endpoint.
+        notification_manager: Manager for sending notifications.
+        _task (asyncio.Task | None): The asyncio task for the monitoring loop.
+        _stop_event (asyncio.Event): Event to signal stopping the monitoring loop.
+    """
 
     def __init__(
         self,
@@ -41,7 +54,13 @@ class EndpointMonitor:
         self._stop_event = asyncio.Event()
 
     async def start(self) -> None:
-        """Start monitoring this endpoint."""
+        """Start monitoring this endpoint.
+
+        This method initializes the monitoring loop for the endpoint and starts
+        the asyncio task to execute checks periodically.
+
+        Logs a warning if the monitor is already running.
+        """
         if self._task and not self._task.done():
             logger.warning("Monitor already running", endpoint=self.config.name)
             return
@@ -51,14 +70,26 @@ class EndpointMonitor:
         logger.info("Started monitoring", endpoint=self.config.name)
 
     async def stop(self) -> None:
-        """Stop monitoring this endpoint."""
+        """Stop monitoring this endpoint.
+
+        This method signals the monitoring loop to stop and waits for the
+        asyncio task to complete.
+
+        Logs an info message when monitoring is stopped.
+        """
         self._stop_event.set()
         if self._task and not self._task.done():
             await self._task
         logger.info("Stopped monitoring", endpoint=self.config.name)
 
     async def _monitor_loop(self) -> None:
-        """Main monitoring loop for this endpoint."""
+        """Main monitoring loop for this endpoint.
+
+        This loop executes checks periodically, stores the results in the database,
+        and sends notifications based on the check results and previous status.
+
+        Handles exceptions and logs errors encountered during the loop.
+        """
         while not self._stop_event.is_set():
             try:
                 # Execute check
