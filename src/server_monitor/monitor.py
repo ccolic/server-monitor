@@ -7,9 +7,18 @@ import signal
 import sys
 from typing import Any
 
+import structlog
+
+from .checks import create_check
+from .config import EndpointConfig, MonitorConfig
+from .database import CheckStatus, DatabaseManager
+from .health import HealthCheckServer
+from .notifications import NotificationContext, create_notification_manager
+
 # Handle TimeoutError compatibility across Python versions
 # In Python 3.10+, asyncio.TimeoutError is an alias for TimeoutError
 # In Python 3.8/3.9, they are different classes
+AsyncTimeoutError: type[Exception]
 try:
     # Test if asyncio.TimeoutError is the same as TimeoutError (Python 3.10+)
     if asyncio.TimeoutError is TimeoutError:
@@ -21,13 +30,6 @@ except AttributeError:
     # Fallback for very old versions
     AsyncTimeoutError = asyncio.TimeoutError
 
-import structlog
-
-from .checks import create_check
-from .config import EndpointConfig, MonitorConfig
-from .database import CheckStatus, DatabaseManager
-from .health import HealthCheckServer
-from .notifications import NotificationContext, create_notification_manager
 
 logger = structlog.get_logger(__name__)
 
