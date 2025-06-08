@@ -121,3 +121,73 @@ async def test_measure_check_with_exception():
     assert metrics.check_counts["test_endpoint"] == 1
     assert metrics.error_counts["test_endpoint"] == 1
     assert len(metrics.check_times["test_endpoint"]) == 1
+
+
+def test_prometheus_metrics_generation():
+    """Test Prometheus metrics generation."""
+    metrics = PerformanceMetrics()
+
+    # Add some test data
+    metrics.record_check_time("test_endpoint", 0.5, True)
+    metrics.record_check_time("test_endpoint", 1.2, True)
+    metrics.record_error("test_endpoint")
+
+    prometheus_output = metrics.get_prometheus_metrics()
+
+    # Check that it's a string with Prometheus format
+    assert isinstance(prometheus_output, str)
+    assert "# HELP" in prometheus_output
+    assert "# TYPE" in prometheus_output
+    assert "server_monitor_checks_total" in prometheus_output
+    assert "server_monitor_response_time_seconds" in prometheus_output
+    assert "server_monitor_endpoint_up" in prometheus_output
+
+
+def test_prometheus_content_type():
+    """Test Prometheus content type."""
+    metrics = PerformanceMetrics()
+    content_type = metrics.get_prometheus_content_type()
+
+    assert content_type.startswith("text/plain")
+    assert "version=0.0.4" in content_type
+
+
+def test_prometheus_metrics_labels():
+    """Test that Prometheus metrics include correct labels."""
+    metrics = PerformanceMetrics()
+
+    # Add different types of checks
+    metrics.record_check_time("http_endpoint", 0.5, True)
+    metrics.record_check_time("tcp_endpoint", 1.2, True)
+    metrics.record_error("api_endpoint")
+
+    prometheus_output = metrics.get_prometheus_metrics()
+
+    # Check for endpoint labels
+    assert 'endpoint="http_endpoint"' in prometheus_output
+    assert 'endpoint="tcp_endpoint"' in prometheus_output
+    assert 'endpoint="api_endpoint"' in prometheus_output
+
+    # Check for status labels
+    assert 'status="success"' in prometheus_output
+    assert 'status="failure"' in prometheus_output
+
+
+def test_record_check_time_with_success_parameter():
+    """Test recording check times with explicit success parameter."""
+    metrics = PerformanceMetrics()
+
+    # Test successful check
+    metrics.record_check_time("test_endpoint", 1.5, True)
+    assert metrics.check_counts["test_endpoint"] == 1
+    assert metrics.error_counts["test_endpoint"] == 0
+
+    # Test failed check
+    metrics.record_check_time("test_endpoint", 2.0, False)
+    assert metrics.check_counts["test_endpoint"] == 2
+    assert metrics.error_counts["test_endpoint"] == 1
+
+    # Test default (should be True)
+    metrics.record_check_time("test_endpoint", 1.0)
+    assert metrics.check_counts["test_endpoint"] == 3
+    assert metrics.error_counts["test_endpoint"] == 1

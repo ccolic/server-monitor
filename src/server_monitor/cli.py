@@ -340,16 +340,22 @@ def validate(config_path: str) -> None:
 @click.option(
     "--format",
     "output_format",
-    type=click.Choice(["table", "json"]),
-    default="table",
+    type=click.Choice(["table", "json", "prometheus"]),
+    default="prometheus",
     help="Output format",
 )
 def metrics(output_format: str) -> None:
     """Show performance metrics."""
     from .metrics import metrics as perf_metrics
 
-    summary = perf_metrics.get_metrics_summary()
     console = Console()
+
+    if output_format == "prometheus":
+        prometheus_output = perf_metrics.get_prometheus_metrics()
+        console.print(prometheus_output)
+        return
+
+    summary = perf_metrics.get_metrics_summary()
 
     if output_format == "json":
         console.print_json(data=summary)

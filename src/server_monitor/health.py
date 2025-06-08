@@ -18,7 +18,8 @@ class HealthCheckServer:
     def _setup_routes(self) -> None:
         """Set up HTTP routes."""
         self.app.router.add_get("/health", self.health_check)
-        self.app.router.add_get("/metrics", self.get_metrics)
+        self.app.router.add_get("/metrics", self.get_prometheus_metrics)
+        self.app.router.add_get("/metrics/json", self.get_json_metrics)
         self.app.router.add_get("/status", self.get_status)
 
     async def health_check(self, request: web.Request) -> web.Response:
@@ -27,9 +28,18 @@ class HealthCheckServer:
             {"status": "healthy", "timestamp": metrics.last_reset.isoformat()}
         )
 
-    async def get_metrics(self, request: web.Request) -> web.Response:
-        """Get performance metrics."""
+    async def get_json_metrics(self, request: web.Request) -> web.Response:
+        """Get performance metrics in JSON format."""
         return web.json_response(metrics.get_metrics_summary())
+
+    async def get_prometheus_metrics(self, request: web.Request) -> web.Response:
+        """Get performance metrics in Prometheus format."""
+        prometheus_data = metrics.get_prometheus_metrics()
+        # Split content type to remove charset for aiohttp compatibility
+        content_type = metrics.get_prometheus_content_type().split(";")[0]
+        return web.Response(
+            text=prometheus_data, content_type=content_type, charset="utf-8"
+        )
 
     async def get_status(self, request: web.Request) -> web.Response:
         """Get detailed status information."""

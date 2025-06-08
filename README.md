@@ -195,6 +195,54 @@ The health check endpoint is used for Docker container monitoring. It returns "O
 server-monitor health
 ```
 
+## Metrics and Monitoring
+
+Server Monitor provides comprehensive metrics in Prometheus format for integration with monitoring systems like Prometheus, Grafana, and others.
+
+### Accessing Metrics
+
+When the daemon is running, metrics are exposed via HTTP endpoints:
+
+- **Prometheus format** (default): `http://localhost:8080/metrics`
+- **Health check**: `http://localhost:8080/health`
+- **Status**: `http://localhost:8080/status`
+
+### Prometheus Metrics
+
+The following metrics are available:
+
+| Metric Name | Type | Description | Labels |
+|-------------|------|-------------|--------|
+| `server_monitor_checks_total` | Counter | Total number of health checks performed | `endpoint`, `status` |
+| `server_monitor_response_time_seconds` | Histogram | Response time of health checks in seconds | `endpoint` |
+| `server_monitor_endpoint_up` | Gauge | Whether the endpoint is up (1) or down (0) | `endpoint` |
+| `server_monitor_uptime_seconds` | Gauge | Monitor uptime in seconds | - |
+| `server_monitor_endpoint_success_rate` | Gauge | Success rate of endpoint checks (0-1) | `endpoint` |
+| `server_monitor_endpoint_avg_response_time_seconds` | Gauge | Average response time for endpoint in seconds | `endpoint` |
+
+### Prometheus Configuration
+
+Add this job to your `prometheus.yml`:
+
+```yaml
+scrape_configs:
+  - job_name: 'server-monitor'
+    static_configs:
+      - targets: ['localhost:8080']
+    scrape_interval: 30s
+    metrics_path: /metrics
+```
+
+### CLI Metrics
+
+View metrics from the command line:
+
+```bash
+# Prometheus format (default)
+server-monitor metrics
+
+```
+
 ## Check Types
 
 ### HTTP/HTTPS Checks
