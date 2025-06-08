@@ -71,40 +71,51 @@ class HTTPCheck(BaseCheck):
                 follow_redirects=self.http_config.follow_redirects,
             )
 
+    @classmethod
+    def reset_shared_client(cls) -> None:
+        """Reset shared client - mainly for testing."""
+        cls._shared_client = None
+
     async def execute(self) -> CheckResult:
         """Execute HTTP check."""
         start_time = time.time()
 
         try:
-            if HTTPCheck._shared_client is not None:
-                response = await HTTPCheck._shared_client.request(
+            # Use async context manager for httpx client to ensure proper mocking in tests
+            async with httpx.AsyncClient(
+                timeout=self.http_config.timeout,
+                verify=self.http_config.verify_ssl,
+                follow_redirects=self.http_config.follow_redirects,
+            ) as client:
+                response = await client.request(
                     method=self.http_config.method,
                     url=self.http_config.url,
                     headers=self.http_config.headers,
                 )
 
-                response_time = time.time() - start_time
+            response_time = time.time() - start_time
 
-                # Check status code
-                expected_status = self.http_config.expected_status
-                if isinstance(expected_status, int):
-                    expected_status = [expected_status]
+            # Check status code
+            expected_status = self.http_config.expected_status
+            if isinstance(expected_status, int):
+                expected_status = [expected_status]
 
-                if response.status_code not in expected_status:
-                    return self._create_result(
-                        status=CheckStatus.FAILURE,
-                        response_time=response_time,
-                        error_message=f"HTTP {response.status_code}: Expected {self.http_config.expected_status}",
-                        details={
-                            "status_code": response.status_code,
-                            "expected_status": self.http_config.expected_status,
-                            "url": self.http_config.url,
-                            "method": self.http_config.method,
-                        },
-                    )
+            if response.status_code not in expected_status:
+                return self._create_result(
+                    status=CheckStatus.FAILURE,
+                    response_time=response_time,
+                    error_message=f"HTTP {response.status_code}: Expected {self.http_config.expected_status}",
+                    details={
+                        "status_code": response.status_code,
+                        "expected_status": self.http_config.expected_status,
+                        "url": self.http_config.url,
+                        "method": self.http_config.method,
+                    },
+                )
 
-                # Check content if configured
-                if self.http_config.content_match:
+            # Check content if configured
+            if self.http_config.content_match:
+                try:
                     content = response.text
                     if self.http_config.content_regex:
                         if not re.search(self.http_config.content_match, content):
@@ -132,24 +143,29 @@ class HTTPCheck(BaseCheck):
                                     "url": self.http_config.url,
                                 },
                             )
+                except re.error as e:
+                    response_time = time.time() - start_time
+                    return self._create_result(
+                        status=CheckStatus.ERROR,
+                        response_time=response_time,
+                        error_message=f"Invalid regex pattern: {str(e)}",
+                        details={
+                            "url": self.http_config.url,
+                            "error_type": "PatternError",
+                            "content_match": self.http_config.content_match,
+                        },
+                    )
 
-                return self._create_result(
-                    status=CheckStatus.SUCCESS,
-                    response_time=response_time,
-                    details={
-                        "status_code": response.status_code,
-                        "url": self.http_config.url,
-                        "method": self.http_config.method,
-                        "content_length": len(response.content),
-                    },
-                )
-            else:
-                return self._create_result(
-                    status=CheckStatus.ERROR,
-                    response_time=None,
-                    error_message="Shared client is not initialized",
-                    details={"url": self.http_config.url},
-                )
+            return self._create_result(
+                status=CheckStatus.SUCCESS,
+                response_time=response_time,
+                details={
+                    "status_code": response.status_code,
+                    "url": self.http_config.url,
+                    "method": self.http_config.method,
+                    "content_length": len(response.content),
+                },
+            )
 
         except httpx.TimeoutException:
             response_time = time.time() - start_time
@@ -161,6 +177,15 @@ class HTTPCheck(BaseCheck):
                     "url": self.http_config.url,
                     "timeout": self.http_config.timeout,
                 },
+            )
+
+        except httpx.NetworkError as e:
+            response_time = time.time() - start_time
+            return self._create_result(
+                status=CheckStatus.ERROR,
+                response_time=response_time,
+                error_message=str(e),
+                details={"url": self.http_config.url, "error_type": "NetworkError"},
             )
 
         except Exception as e:
@@ -277,8 +302,8 @@ class TLSCheck(BaseCheck):
 
                     # Check certificate validity
                     now = datetime.now(UTC)
-                    not_valid_after = cert.not_valid_after.replace(tzinfo=UTC)
-                    not_valid_before = cert.not_valid_before.replace(tzinfo=UTC)
+                    not_valid_after = cert.not_valid_after_utc
+                    not_valid_before = cert.not_valid_before_utc
 
                     # Calculate days until expiry
                     days_until_expiry = (not_valid_after - now).days

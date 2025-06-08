@@ -9,6 +9,9 @@ from server_monitor.config import CheckType, EndpointConfig, HTTPCheckConfig
 
 @pytest.mark.asyncio
 async def test_http_check_content_match_plain_text():
+    # Reset shared client for clean test
+    HTTPCheck.reset_shared_client()
+
     config = EndpointConfig(
         name="Test HTTP Content Plain",
         type=CheckType.HTTP,
@@ -35,6 +38,9 @@ async def test_http_check_content_match_plain_text():
 
 @pytest.mark.asyncio
 async def test_http_check_unexpected_status_and_content():
+    # Reset shared client for clean test
+    HTTPCheck.reset_shared_client()
+
     config = EndpointConfig(
         name="Test HTTP Combo",
         type=CheckType.HTTP,
@@ -64,6 +70,9 @@ async def test_http_check_unexpected_status_and_content():
 
 @pytest.mark.asyncio
 async def test_http_check_invalid_regex():
+    # Reset shared client for clean test
+    HTTPCheck.reset_shared_client()
+
     config = EndpointConfig(
         name="Test HTTP Invalid Regex",
         type=CheckType.HTTP,
@@ -94,6 +103,9 @@ async def test_http_check_invalid_regex():
 
 @pytest.mark.asyncio
 async def test_http_check_network_error():
+    # Reset shared client for clean test
+    HTTPCheck.reset_shared_client()
+
     config = EndpointConfig(
         name="Test HTTP Network Error",
         type=CheckType.HTTP,
