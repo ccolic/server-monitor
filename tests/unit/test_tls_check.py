@@ -1,5 +1,10 @@
 import ssl
-from datetime import UTC, datetime, timedelta
+
+try:
+    from datetime import UTC
+except ImportError:
+    UTC = UTC
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

@@ -51,6 +51,9 @@ dev = [
     "asyncpg-stubs>=0.30.1",
     "types-PyYAML>=6.0.12"
 ]
+legacy = [
+    "eval_type_backport; python_version < '3.10'"
+]
 
 [project.scripts]
 server-monitor = "server_monitor.cli:main"
