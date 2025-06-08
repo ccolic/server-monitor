@@ -43,12 +43,12 @@ class HealthCheckServer:
 
     async def start(self) -> None:
         """Start the health check server."""
-        runner = web.AppRunner(self.app)
-        await runner.setup()
-        site = web.TCPSite(runner, "localhost", self.port)
+        self.runner = web.AppRunner(self.app)
+        await self.runner.setup()
+        site = web.TCPSite(self.runner, "localhost", self.port)
         await site.start()
 
     async def stop(self) -> None:
         """Stop the health check server."""
-        if hasattr(self, "runner"):
+        if hasattr(self, "runner") and self.runner:
             await self.runner.cleanup()

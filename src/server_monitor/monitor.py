@@ -13,6 +13,7 @@ import structlog
 from .checks import create_check
 from .config import EndpointConfig, MonitorConfig
 from .database import CheckStatus, DatabaseManager
+from .health import HealthCheckServer
 from .notifications import NotificationContext, create_notification_manager
 
 logger = structlog.get_logger(__name__)
@@ -153,9 +154,10 @@ class EndpointMonitor:
 class MonitorDaemon:
     """Main monitoring daemon that manages all endpoint monitors."""
 
-    def __init__(self, config: MonitorConfig) -> None:
+    def __init__(self, config: MonitorConfig, health_port: int = 8080) -> None:
         self.config = config
         self.db_manager = DatabaseManager(config.global_config.database)
+        self.health_server = HealthCheckServer(health_port)
         self.endpoint_monitors: dict[str, EndpointMonitor] = {}
         self._shutdown_event = asyncio.Event()
         self._semaphore = asyncio.Semaphore(config.global_config.max_concurrent_checks)
@@ -193,6 +195,10 @@ class MonitorDaemon:
         # Set up signal handlers for graceful shutdown
         self._setup_signal_handlers()
 
+        # Start health check server
+        await self.health_server.start()
+        logger.info("Health check server started", port=self.health_server.port)
+
         # Start all endpoint monitors
         start_tasks: list[asyncio.Task[Any]] = []
         for monitor in self.endpoint_monitors.values():
@@ -210,6 +216,13 @@ class MonitorDaemon:
     async def stop(self) -> None:
         """Stop the monitoring daemon."""
         logger.info("Stopping monitoring daemon...")
+
+        # Stop health check server
+        try:
+            await self.health_server.stop()
+            logger.info("Health check server stopped")
+        except Exception as e:
+            logger.warning("Error stopping health check server", error=str(e))
 
         # Stop all endpoint monitors with timeout
         stop_tasks: list[asyncio.Task[Any]] = []

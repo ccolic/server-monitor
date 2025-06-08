@@ -109,7 +109,7 @@ def start(config_path: str, validate_only: bool, health_port: int) -> None:
         )
 
         # Create and start daemon
-        daemon = MonitorDaemon(config)
+        daemon = MonitorDaemon(config, health_port)
 
         # Run event loop
         loop = asyncio.get_event_loop()

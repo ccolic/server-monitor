@@ -39,7 +39,8 @@ ENV PYTHONFAULTHANDLER=1 \
 # Install runtime dependencies
 RUN apk add --no-cache \
         ca-certificates \
-        libpq
+        libpq \
+        curl
 
 # Set up working directory
 WORKDIR /app
@@ -64,4 +65,4 @@ CMD ["start", "/app/config.yaml"]
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD python -m server_monitor.cli health || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
