@@ -256,6 +256,16 @@ def generate_config(output: str) -> None:
     click.echo(f"Sample configuration written to {output}")
 
 
+@cli.command()
+def health() -> None:
+    """Health check endpoint for Docker container monitoring."""
+    try:
+        click.echo("OK")
+    except Exception as e:
+        click.echo(f"Error: {str(e)}", err=True)
+        sys.exit(1)
+
+
 def main() -> None:
     """Entry point for the application."""
     cli()

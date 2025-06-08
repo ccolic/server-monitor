@@ -173,6 +173,28 @@ docker run -v $(pwd)/config.yaml:/app/config.yaml \
            ghcr.io/yourusername/server-monitor:latest
 ```
 
+## Usage Examples
+
+### Start Monitoring
+
+```bash
+server-monitor start config.yaml
+```
+
+### Check Status
+
+```bash
+server-monitor status config.yaml --output json
+```
+
+### Health Check
+
+The health check endpoint is used for Docker container monitoring. It returns "OK" if the application is running correctly.
+
+```bash
+server-monitor health
+```
+
 ## Check Types
 
 ### HTTP/HTTPS Checks
@@ -220,6 +242,28 @@ tls:
   timeout: 30
   cert_expiry_warning_days: 30
 ```
+
+## Troubleshooting
+
+### Database Connection Errors
+
+- Ensure the database server is running and accessible.
+- Verify the connection details in `config.yaml`.
+
+### Docker Health Check Failures
+
+- Check the logs for errors using:
+
+```bash
+docker logs <container_id>
+```
+
+- Ensure the health check endpoint is accessible.
+
+### Configuration Issues
+
+- Validate the YAML syntax in `config.yaml`.
+- Use the `generate-config` command to create a new configuration file.
 
 ## Development
 
