@@ -5,8 +5,21 @@ from __future__ import annotations
 import asyncio
 import signal
 import sys
-from concurrent.futures import TimeoutError
 from typing import Any
+
+# Handle TimeoutError compatibility across Python versions
+# In Python 3.10+, asyncio.TimeoutError is an alias for TimeoutError
+# In Python 3.8/3.9, they are different classes
+try:
+    # Test if asyncio.TimeoutError is the same as TimeoutError (Python 3.10+)
+    if asyncio.TimeoutError is TimeoutError:
+        AsyncTimeoutError = TimeoutError
+    else:
+        # Python 3.8/3.9 - they are different
+        AsyncTimeoutError = asyncio.TimeoutError
+except AttributeError:
+    # Fallback for very old versions
+    AsyncTimeoutError = asyncio.TimeoutError
 
 import structlog
 
@@ -147,7 +160,7 @@ class EndpointMonitor:
                 )
                 # If we reach here, stop event was set
                 break
-            except TimeoutError:
+            except AsyncTimeoutError:
                 # Timeout is expected, continue to next check
                 # Check again if stop event was set (helpful for fast shutdown)
                 if self._stop_event.is_set():
@@ -244,13 +257,13 @@ class MonitorDaemon:
                 asyncio.gather(*stop_tasks, return_exceptions=True),
                 timeout=self._shutdown_timeout,
             )
-        except TimeoutError:
+        except AsyncTimeoutError:
             logger.warning(f"Clean shutdown timed out after {self._shutdown_timeout}s")
 
         try:
             # Close database connections with timeout
             await asyncio.wait_for(self.db_manager.close(), timeout=2.0)
-        except TimeoutError:
+        except AsyncTimeoutError:
             logger.warning("Database close operation timed out")
 
         logger.info("Monitoring daemon stopped")
