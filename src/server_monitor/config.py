@@ -74,15 +74,39 @@ class NotificationConfig(BaseModel):
 class EmailNotificationConfig(NotificationConfig):
     """Email notification configuration."""
 
-    smtp: SMTPConfig
-    recipients: list[str]
+    smtp: SMTPConfig | None = None
+    recipients: list[str] | None = None
     subject_template: str = "Monitor Alert: {endpoint_name} - {status}"
+
+    @model_validator(mode="after")
+    def validate_enabled_fields(self) -> EmailNotificationConfig:
+        """Validate that required fields are present when enabled."""
+        if self.enabled:
+            if self.smtp is None:
+                raise ValueError(
+                    "smtp configuration is required when email notifications are enabled"
+                )
+            if self.recipients is None or not self.recipients:
+                raise ValueError(
+                    "recipients list is required when email notifications are enabled"
+                )
+        return self
 
 
 class WebhookNotificationConfig(NotificationConfig):
     """Webhook notification configuration."""
 
-    webhook: WebhookConfig
+    webhook: WebhookConfig | None = None
+
+    @model_validator(mode="after")
+    def validate_enabled_fields(self) -> WebhookNotificationConfig:
+        """Validate that required fields are present when enabled."""
+        if self.enabled:
+            if self.webhook is None:
+                raise ValueError(
+                    "webhook configuration is required when webhook notifications are enabled"
+                )
+        return self
 
 
 class DatabaseConfig(BaseModel):

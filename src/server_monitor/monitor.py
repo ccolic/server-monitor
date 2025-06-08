@@ -99,6 +99,10 @@ class EndpointMonitor:
                 async with metrics.measure_check(self.config.name):
                     result = await self.check.execute()
 
+                # Record error in metrics if check failed
+                if result.status != CheckStatus.SUCCESS:
+                    metrics.record_error(self.config.name)
+
                 # Get previous status for notification context
                 previous_status_data = await self.db_manager.get_endpoint_status(
                     self.config.name

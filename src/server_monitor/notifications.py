@@ -80,6 +80,8 @@ class EmailNotifier(BaseNotifier):
 
     def __init__(self, config: EmailNotificationConfig):
         super().__init__(config)
+        if config.smtp is None:
+            raise ValueError("SMTP configuration is required for email notifications")
         self.smtp_config = config.smtp
 
     async def send_notification(self, context: NotificationContext) -> bool:
@@ -88,6 +90,8 @@ class EmailNotifier(BaseNotifier):
             # Create email message
             msg = MIMEMultipart()
             msg["From"] = self.smtp_config.from_email
+            if self.config.recipients is None:
+                raise ValueError("Recipients list is required for email notifications")
             msg["To"] = ", ".join(self.config.recipients)
 
             # Format subject
@@ -204,6 +208,10 @@ class WebhookNotifier(BaseNotifier):
 
     def __init__(self, config: WebhookNotificationConfig):
         super().__init__(config)
+        if config.webhook is None:
+            raise ValueError(
+                "Webhook configuration is required for webhook notifications"
+            )
         self.webhook_config = config.webhook
 
     async def send_notification(self, context: NotificationContext) -> bool:
@@ -327,10 +335,10 @@ def create_notification_manager(
     email_config = endpoint_email_config or global_email_config
     webhook_config = endpoint_webhook_config or global_webhook_config
 
-    if email_config:
+    if email_config and email_config.enabled:
         manager.add_notifier(EmailNotifier(email_config))
 
-    if webhook_config:
+    if webhook_config and webhook_config.enabled:
         manager.add_notifier(WebhookNotifier(webhook_config))
 
     return manager

@@ -79,14 +79,20 @@ class DatabaseManager:
             # Create database file if it doesn't exist
             import aiosqlite
 
-            self._pool = await aiosqlite.connect(
-                self.config.database or "monitor.db", timeout=30.0
+            # Extract database path from URL
+            database_path = (
+                self.config.url.replace("sqlite:///", "")
+                if self.config.url is not None
+                else "monitor.db"
             )
-            # Enable WAL mode for better concurrent access
-            await self._pool.execute("PRAGMA journal_mode=WAL")
-            await self._pool.execute("PRAGMA synchronous=NORMAL")
+
+            self._pool = await aiosqlite.connect(database_path, timeout=30.0)
+            # Enable WAL mode for better concurrent access (except for in-memory DBs)
+            if database_path != ":memory:":
+                await self._pool.execute("PRAGMA journal_mode=WAL")
+                await self._pool.execute("PRAGMA synchronous=NORMAL")
             await self._pool.commit()
-            logger.info("SQLite connection initialized", database=self.config.database)
+            logger.info("SQLite connection initialized", database=database_path)
         except Exception as e:
             logger.error("Failed to initialize SQLite connection", error=str(e))
             raise
@@ -176,9 +182,14 @@ class DatabaseManager:
         );
         """
 
-        async with aiosqlite.connect(database_path) as conn:
-            await conn.executescript(create_table_sql)
-            await conn.commit()
+        # Use existing connection for in-memory databases, create new one for file databases
+        if database_path == ":memory:" and self._pool:
+            await self._pool.executescript(create_table_sql)
+            await self._pool.commit()
+        else:
+            async with aiosqlite.connect(database_path) as conn:
+                await conn.executescript(create_table_sql)
+                await conn.commit()
 
     async def store_result(self, result: CheckResult) -> None:
         """Store a check result."""
@@ -242,8 +253,9 @@ class DatabaseManager:
             json.dumps(result.details) if result.details is not None else None
         )
 
-        async with aiosqlite.connect(database_path) as conn:
-            await conn.execute(
+        # Use existing connection for in-memory databases, create new one for file databases
+        if database_path == ":memory:" and self._pool:
+            await self._pool.execute(
                 insert_sql,
                 (
                     result.endpoint_name,
@@ -255,7 +267,22 @@ class DatabaseManager:
                     result.timestamp.isoformat(),
                 ),
             )
-            await conn.commit()
+            await self._pool.commit()
+        else:
+            async with aiosqlite.connect(database_path) as conn:
+                await conn.execute(
+                    insert_sql,
+                    (
+                        result.endpoint_name,
+                        result.check_type,
+                        result.status.value,
+                        result.response_time,
+                        result.error_message,
+                        details_json,
+                        result.timestamp.isoformat(),
+                    ),
+                )
+                await conn.commit()
 
     async def _update_endpoint_status(self, result: CheckResult) -> None:
         """Update endpoint status summary."""
@@ -325,8 +352,9 @@ class DatabaseManager:
         )
         """
 
-        async with aiosqlite.connect(database_path) as conn:
-            await conn.execute(
+        # Use existing connection for in-memory databases, create new one for file databases
+        if database_path == ":memory:" and self._pool:
+            await self._pool.execute(
                 upsert_sql,
                 (
                     result.endpoint_name,
@@ -342,7 +370,26 @@ class DatabaseManager:
                     datetime.now().isoformat(),
                 ),
             )
-            await conn.commit()
+            await self._pool.commit()
+        else:
+            async with aiosqlite.connect(database_path) as conn:
+                await conn.execute(
+                    upsert_sql,
+                    (
+                        result.endpoint_name,
+                        result.status.value,
+                        result.status.value,
+                        result.timestamp.isoformat(),
+                        result.endpoint_name,
+                        result.status.value,
+                        result.timestamp.isoformat(),
+                        result.endpoint_name,
+                        result.status.value,
+                        result.endpoint_name,
+                        datetime.now().isoformat(),
+                    ),
+                )
+                await conn.commit()
 
     async def get_endpoint_status(self, endpoint_name: str) -> dict[str, Any] | None:
         """Get current status for an endpoint."""
@@ -389,13 +436,22 @@ class DatabaseManager:
         WHERE endpoint_name = ?
         """
 
-        async with aiosqlite.connect(database_path) as conn:
-            conn.row_factory = aiosqlite.Row
-            async with conn.execute(select_sql, (endpoint_name,)) as cursor:
+        # Use existing connection for in-memory databases, create new one for file databases
+        if database_path == ":memory:" and self._pool:
+            self._pool.row_factory = aiosqlite.Row
+            async with self._pool.execute(select_sql, (endpoint_name,)) as cursor:
                 row = await cursor.fetchone()
                 if row:
                     return dict(row)
                 return None
+        else:
+            async with aiosqlite.connect(database_path) as conn:
+                conn.row_factory = aiosqlite.Row
+                async with conn.execute(select_sql, (endpoint_name,)) as cursor:
+                    row = await cursor.fetchone()
+                    if row:
+                        return dict(row)
+                    return None
 
     async def close(self) -> None:
         """Close database connections."""
