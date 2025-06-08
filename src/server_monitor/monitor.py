@@ -167,7 +167,7 @@ class MonitorDaemon:
         self._semaphore = asyncio.Semaphore(config.global_config.max_concurrent_checks)
         self._shutdown_in_progress = False
         self._interrupt_count = 0
-        self._shutdown_timeout = 10.0  # seconds
+        self._shutdown_timeout = 5.0  # seconds
         self._original_sigterm_handler: Any = None
         self._original_sigint_handler: Any = None
 
