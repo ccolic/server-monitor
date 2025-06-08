@@ -1,4 +1,5 @@
-FROM python:3.11-slim
+# Stage 1: Builder
+FROM python:3.11-slim AS builder
 
 # Set up environment
 ENV PYTHONFAULTHANDLER=1 \
@@ -9,7 +10,7 @@ ENV PYTHONFAULTHANDLER=1 \
     PIP_DEFAULT_TIMEOUT=100 \
     PYTHONPATH=${PYTHONPATH}:/app
 
-# Install dependencies
+# Install build dependencies
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -26,6 +27,26 @@ COPY pyproject.toml ./
 # Install dependencies
 RUN pip install --no-cache-dir -e .
 
+# Stage 2: Final Image
+FROM python:3.11-alpine
+
+# Set up environment
+ENV PYTHONFAULTHANDLER=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONHASHSEED=random \
+    PYTHONPATH=${PYTHONPATH}:/app
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+        ca-certificates \
+        libpq
+
+# Set up working directory
+WORKDIR /app
+
+# Copy compiled dependencies from builder stage
+COPY --from=builder /app /app
+
 # Copy source code
 COPY src/ /app/src/
 
@@ -33,7 +54,7 @@ COPY src/ /app/src/
 COPY config.yaml.example /app/config.yaml
 
 # Create user
-RUN groupadd -r monitor && useradd -r -g monitor monitor
+RUN addgroup -S monitor && adduser -S monitor -G monitor
 RUN chown -R monitor:monitor /app
 USER monitor
 
