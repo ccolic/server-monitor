@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from enum import Enum
 from pathlib import Path
 
@@ -243,6 +244,17 @@ class MonitorConfig(BaseModel):
         """Load configuration from YAML file."""
         with open(file_path) as f:
             data = yaml.safe_load(f)
+
+        # Load sensitive information from environment variables
+        if (
+            "email_notifications" in data["global"]
+            and "smtp" in data["global"]["email_notifications"]
+        ):
+            data["global"]["email_notifications"]["smtp"]["password"] = os.getenv(
+                "SMTP_PASSWORD",
+                data["global"]["email_notifications"]["smtp"].get("password"),
+            )
+
         return cls(**data)
 
     def to_yaml(self, file_path: str | Path) -> None:

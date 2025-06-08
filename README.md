@@ -133,6 +133,15 @@ endpoints:
   # More endpoints...
 ```
 
+## Environment Variables
+
+To securely store sensitive information, set the following environment variables:
+
+- `SMTP_USERNAME`: Your SMTP username.
+- `SMTP_PASSWORD`: Your SMTP password.
+
+These variables will override the values in `config.yaml`.
+
 ## Usage
 
 ### Start Monitoring
