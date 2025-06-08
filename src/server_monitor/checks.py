@@ -76,72 +76,80 @@ class HTTPCheck(BaseCheck):
         start_time = time.time()
 
         try:
-            response = await HTTPCheck._shared_client.request(
-                method=self.http_config.method,
-                url=self.http_config.url,
-                headers=self.http_config.headers,
-            )
-
-            response_time = time.time() - start_time
-
-            # Check status code
-            expected_status = self.http_config.expected_status
-            if isinstance(expected_status, int):
-                expected_status = [expected_status]
-
-            if response.status_code not in expected_status:
-                return self._create_result(
-                    status=CheckStatus.FAILURE,
-                    response_time=response_time,
-                    error_message=f"HTTP {response.status_code}: Expected {self.http_config.expected_status}",
-                    details={
-                        "status_code": response.status_code,
-                        "expected_status": self.http_config.expected_status,
-                        "url": self.http_config.url,
-                        "method": self.http_config.method,
-                    },
+            if HTTPCheck._shared_client is not None:
+                response = await HTTPCheck._shared_client.request(
+                    method=self.http_config.method,
+                    url=self.http_config.url,
+                    headers=self.http_config.headers,
                 )
 
-            # Check content if configured
-            if self.http_config.content_match:
-                content = response.text
-                if self.http_config.content_regex:
-                    if not re.search(self.http_config.content_match, content):
-                        return self._create_result(
-                            status=CheckStatus.FAILURE,
-                            response_time=response_time,
-                            error_message=f"Content regex '{self.http_config.content_match}' not found",
-                            details={
-                                "status_code": response.status_code,
-                                "content_match": self.http_config.content_match,
-                                "content_regex": True,
-                                "url": self.http_config.url,
-                            },
-                        )
-                else:
-                    if self.http_config.content_match not in content:
-                        return self._create_result(
-                            status=CheckStatus.FAILURE,
-                            response_time=response_time,
-                            error_message=f"Content '{self.http_config.content_match}' not found",
-                            details={
-                                "status_code": response.status_code,
-                                "content_match": self.http_config.content_match,
-                                "content_regex": False,
-                                "url": self.http_config.url,
-                            },
-                        )
+                response_time = time.time() - start_time
 
-            return self._create_result(
-                status=CheckStatus.SUCCESS,
-                response_time=response_time,
-                details={
-                    "status_code": response.status_code,
-                    "url": self.http_config.url,
-                    "method": self.http_config.method,
-                    "content_length": len(response.content),
-                },
-            )
+                # Check status code
+                expected_status = self.http_config.expected_status
+                if isinstance(expected_status, int):
+                    expected_status = [expected_status]
+
+                if response.status_code not in expected_status:
+                    return self._create_result(
+                        status=CheckStatus.FAILURE,
+                        response_time=response_time,
+                        error_message=f"HTTP {response.status_code}: Expected {self.http_config.expected_status}",
+                        details={
+                            "status_code": response.status_code,
+                            "expected_status": self.http_config.expected_status,
+                            "url": self.http_config.url,
+                            "method": self.http_config.method,
+                        },
+                    )
+
+                # Check content if configured
+                if self.http_config.content_match:
+                    content = response.text
+                    if self.http_config.content_regex:
+                        if not re.search(self.http_config.content_match, content):
+                            return self._create_result(
+                                status=CheckStatus.FAILURE,
+                                response_time=response_time,
+                                error_message=f"Content regex '{self.http_config.content_match}' not found",
+                                details={
+                                    "status_code": response.status_code,
+                                    "content_match": self.http_config.content_match,
+                                    "content_regex": True,
+                                    "url": self.http_config.url,
+                                },
+                            )
+                    else:
+                        if self.http_config.content_match not in content:
+                            return self._create_result(
+                                status=CheckStatus.FAILURE,
+                                response_time=response_time,
+                                error_message=f"Content '{self.http_config.content_match}' not found",
+                                details={
+                                    "status_code": response.status_code,
+                                    "content_match": self.http_config.content_match,
+                                    "content_regex": False,
+                                    "url": self.http_config.url,
+                                },
+                            )
+
+                return self._create_result(
+                    status=CheckStatus.SUCCESS,
+                    response_time=response_time,
+                    details={
+                        "status_code": response.status_code,
+                        "url": self.http_config.url,
+                        "method": self.http_config.method,
+                        "content_length": len(response.content),
+                    },
+                )
+            else:
+                return self._create_result(
+                    status=CheckStatus.ERROR,
+                    response_time=None,
+                    error_message="Shared client is not initialized",
+                    details={"url": self.http_config.url},
+                )
 
         except httpx.TimeoutException:
             response_time = time.time() - start_time
