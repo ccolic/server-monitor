@@ -263,7 +263,7 @@ class MonitorConfig(BaseModel):
     endpoints: list[EndpointConfig]
 
     model_config = {
-        "validate_by_name": True,
+        "validate_by_name": True,  # type: ignore
     }
 
     @classmethod
