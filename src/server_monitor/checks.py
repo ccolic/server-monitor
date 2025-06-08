@@ -12,7 +12,9 @@ from abc import ABC, abstractmethod
 try:
     from datetime import UTC
 except ImportError:
-    UTC = UTC
+    from datetime import timezone
+
+    UTC = timezone.utc  # noqa: UP017
 from datetime import datetime
 from typing import Any
 
