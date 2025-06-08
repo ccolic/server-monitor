@@ -8,6 +8,8 @@ global:
     enabled: true
     events:
       - both
+    failure_threshold: 3  # Send alert after 3 consecutive failures
+    suppress_repeated: true  # Don't send repeated alerts for same failure
     smtp:
       host: smtp.example.com
       port: 587
@@ -34,6 +36,8 @@ global:
     enabled: true
     events:
       - failure
+    failure_threshold: 2  # Send alert after 2 consecutive failures
+    suppress_repeated: true  # Don't send repeated alerts for same failure
     webhook:
       url: https://hooks.slack.com/services/your/webhook/url
       method: POST
@@ -87,4 +91,94 @@ endpoints:
       port: 443
       timeout: 30
       cert_expiry_warning_days: 30
-    # Optional endpoint-specific notifications (inherits from global if not specified)
+
+# Examples of endpoint-specific notification overrides
+# These endpoints demonstrate how to override notification settings
+# while inheriting global SMTP/webhook configurations
+
+  # Critical production API - Alert immediately with custom recipients
+  # - name: Critical Production API
+  #   type: http
+  #   interval: 30
+  #   enabled: true
+  #   http:
+  #     url: https://api.production.com/health
+  #     method: GET
+  #     timeout: 10
+  #     expected_status: 200
+  #   email_notifications:
+  #     enabled: true
+  #     recipients: ["oncall@example.com", "cto@example.com"]  # Override recipients
+  #     failure_threshold: 1                                   # Alert immediately
+  #     subject_template: "🚨 CRITICAL: {endpoint_name} DOWN"
+  #     # Inherits: global SMTP settings, events, suppress_repeated
+  #   webhook_notifications:
+  #     enabled: true
+  #     webhook:
+  #       url: https://hooks.slack.com/services/critical/alerts
+  #       headers:
+  #         Content-Type: application/json
+  #         X-Priority: critical
+  #     failure_threshold: 1                                   # Alert immediately
+  #     # Inherits: global webhook method, timeout, events
+
+  # Development service - Only failure notifications, less sensitive
+  # - name: Development Service
+  #   type: http
+  #   interval: 120
+  #   enabled: true
+  #   http:
+  #     url: https://dev.example.com/health
+  #     method: GET
+  #     timeout: 15
+  #     expected_status: 200
+  #   email_notifications:
+  #     enabled: true
+  #     events: [failure]                    # Only notify on failures
+  #     failure_threshold: 5                 # Less sensitive
+  #     suppress_repeated: false             # Allow repeated notifications
+  #     # Inherits: global SMTP settings, recipients, subject_template
+  #   webhook_notifications:
+  #     enabled: false                       # Disable webhook for dev
+
+  # Internal tool - Custom webhook only, no email
+  # - name: Internal Dashboard
+  #   type: http
+  #   interval: 300
+  #   enabled: true
+  #   http:
+  #     url: https://dashboard.internal.com
+  #     method: GET
+  #     timeout: 20
+  #     expected_status: 200
+  #   email_notifications:
+  #     enabled: false                       # Disable email notifications
+  #   webhook_notifications:
+  #     enabled: true
+  #     webhook:
+  #       url: https://hooks.slack.com/services/team/internal
+  #       headers:
+  #         Content-Type: application/json
+  #         X-Channel: "#internal-alerts"
+  #     events: [both]                       # Both failure and recovery
+  #     failure_threshold: 3
+  #     # Inherits: global webhook method, timeout, suppress_repeated
+
+  # External service - Only recovery notifications
+  # - name: External Partner API
+  #   type: http
+  #   interval: 180
+  #   enabled: true
+  #   http:
+  #     url: https://partner.external.com/api/status
+  #     method: GET
+  #     headers:
+  #       Authorization: Bearer your-external-token
+  #     timeout: 30
+  #     expected_status: 200
+  #   email_notifications:
+  #     enabled: true
+  #     events: [recovery]                   # Only notify when service recovers
+  #     recipients: ["partners@example.com"] # Different recipients
+  #     subject_template: "✅ Partner Service Recovered: {endpoint_name}"
+  #     # Inherits: global SMTP settings, failure_threshold, suppress_repeated

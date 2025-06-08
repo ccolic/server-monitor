@@ -65,6 +65,7 @@ class EndpointMonitor:
             global_webhook_config=global_config.global_config.webhook_notifications,
             endpoint_email_config=config.email_notifications,
             endpoint_webhook_config=config.webhook_notifications,
+            db_manager=db_manager,
         )
         self._task: asyncio.Task[Any] | None = None
         self._stop_event = asyncio.Event()
@@ -124,12 +125,22 @@ class EndpointMonitor:
                 )
                 previous_status = None
                 failure_count = 0
+                consecutive_failures = 0
+                notification_sent = False
+                last_notification = None
 
                 if previous_status_data:
                     previous_status = CheckStatus(
                         previous_status_data["current_status"]
                     )
                     failure_count = int(previous_status_data.get("failure_count", 0))
+                    consecutive_failures = int(
+                        previous_status_data.get("consecutive_failures", 0)
+                    )
+                    notification_sent = bool(
+                        previous_status_data.get("notification_sent", False)
+                    )
+                    last_notification = previous_status_data.get("last_notification")
 
                 # Store result in database
                 await self.db_manager.store_result(result)
@@ -139,6 +150,9 @@ class EndpointMonitor:
                     result=result,
                     previous_status=previous_status,
                     failure_count=failure_count,
+                    consecutive_failures=consecutive_failures,
+                    notification_sent=notification_sent,
+                    last_notification=last_notification,
                 )
 
                 await self.notification_manager.send_notifications(context)

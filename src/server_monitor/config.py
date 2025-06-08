@@ -69,6 +69,8 @@ class NotificationConfig(BaseModel):
     events: list[NotificationEvent] = Field(
         default_factory=lambda: [NotificationEvent.BOTH]
     )
+    failure_threshold: int = 1  # Number of consecutive failures before alerting
+    suppress_repeated: bool = True  # Suppress repeated failure notifications
 
 
 class EmailNotificationConfig(NotificationConfig):
@@ -81,16 +83,59 @@ class EmailNotificationConfig(NotificationConfig):
     @model_validator(mode="after")
     def validate_enabled_fields(self) -> EmailNotificationConfig:
         """Validate that required fields are present when enabled."""
-        if self.enabled:
-            if self.smtp is None:
-                raise ValueError(
-                    "smtp configuration is required when email notifications are enabled"
-                )
-            if self.recipients is None or not self.recipients:
-                raise ValueError(
-                    "recipients list is required when email notifications are enabled"
-                )
+        # Note: For endpoint overrides, validation is relaxed since fields will be merged with global config
+        # The actual validation happens in merge_with_global() method
         return self
+
+    @classmethod
+    def validate_as_global_config(cls, config: EmailNotificationConfig) -> None:
+        """Validate configuration when used as global configuration."""
+        if config.enabled:
+            if config.smtp is None:
+                raise ValueError(
+                    "SMTP configuration is required when global email notifications are enabled"
+                )
+            if config.recipients is None or not config.recipients:
+                raise ValueError(
+                    "Recipients list is required when global email notifications are enabled"
+                )
+
+    def merge_with_global(
+        self, global_config: EmailNotificationConfig | None
+    ) -> EmailNotificationConfig:
+        """Merge this config with global config, using global values as defaults."""
+        if global_config is None:
+            # When there's no global config, validate this config as if it were global
+            self.validate_as_global_config(self)
+            return self
+
+        # Create merged configuration
+        merged_config = EmailNotificationConfig(
+            enabled=self.enabled,
+            events=self.events,
+            failure_threshold=self.failure_threshold,
+            suppress_repeated=self.suppress_repeated,
+            smtp=self.smtp or global_config.smtp,
+            recipients=self.recipients or global_config.recipients,
+            subject_template=self.subject_template
+            if self.subject_template != "Monitor Alert: {endpoint_name} - {status}"
+            else global_config.subject_template,
+        )
+
+        # Validate the merged configuration has all required fields
+        if merged_config.enabled:
+            if merged_config.smtp is None:
+                raise ValueError(
+                    "SMTP configuration is required for email notifications. "
+                    "Ensure global email_notifications.smtp is configured."
+                )
+            if merged_config.recipients is None or not merged_config.recipients:
+                raise ValueError(
+                    "Recipients list is required for email notifications. "
+                    "Specify recipients in global email_notifications or endpoint override."
+                )
+
+        return merged_config
 
 
 class WebhookNotificationConfig(NotificationConfig):
@@ -101,12 +146,46 @@ class WebhookNotificationConfig(NotificationConfig):
     @model_validator(mode="after")
     def validate_enabled_fields(self) -> WebhookNotificationConfig:
         """Validate that required fields are present when enabled."""
-        if self.enabled:
-            if self.webhook is None:
-                raise ValueError(
-                    "webhook configuration is required when webhook notifications are enabled"
-                )
+        # Note: For endpoint overrides, validation is relaxed since fields will be merged with global config
+        # The actual validation happens in merge_with_global() method
         return self
+
+    @classmethod
+    def validate_as_global_config(cls, config: WebhookNotificationConfig) -> None:
+        """Validate configuration when used as global configuration."""
+        if config.enabled:
+            if config.webhook is None:
+                raise ValueError(
+                    "Webhook configuration is required when global webhook notifications are enabled"
+                )
+
+    def merge_with_global(
+        self, global_config: WebhookNotificationConfig | None
+    ) -> WebhookNotificationConfig:
+        """Merge this config with global config, using global values as defaults."""
+        if global_config is None:
+            # When there's no global config, validate this config as if it were global
+            self.validate_as_global_config(self)
+            return self
+
+        # Create merged configuration
+        merged_config = WebhookNotificationConfig(
+            enabled=self.enabled,
+            events=self.events,
+            failure_threshold=self.failure_threshold,
+            suppress_repeated=self.suppress_repeated,
+            webhook=self.webhook or global_config.webhook,
+        )
+
+        # Validate the merged configuration has all required fields
+        if merged_config.enabled:
+            if merged_config.webhook is None:
+                raise ValueError(
+                    "Webhook configuration is required for webhook notifications. "
+                    "Ensure global webhook_notifications.webhook is configured."
+                )
+
+        return merged_config
 
 
 class DatabaseConfig(BaseModel):
@@ -288,7 +367,19 @@ class MonitorConfig(BaseModel):
         # Validate configuration structure
         cls.validate_config_structure(data)
 
-        return cls(**data)
+        config = cls(**data)
+
+        # Validate global notification configurations
+        if config.global_config.email_notifications:
+            EmailNotificationConfig.validate_as_global_config(
+                config.global_config.email_notifications
+            )
+        if config.global_config.webhook_notifications:
+            WebhookNotificationConfig.validate_as_global_config(
+                config.global_config.webhook_notifications
+            )
+
+        return config
 
     @staticmethod
     def validate_config_structure(data: dict[str, Any]) -> None:

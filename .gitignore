@@ -3,8 +3,9 @@
 
 # Project specific
 config.yaml
-monitor.db*
-test.db*
+*.db
+*.db-shm
+*.db-wal
 
 ### Git ###
 # Created by git for backups. To disable backups in Git:

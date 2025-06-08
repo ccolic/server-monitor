@@ -32,10 +32,16 @@ class NotificationContext:
         result: CheckResult,
         previous_status: CheckStatus | None = None,
         failure_count: int = 0,
+        consecutive_failures: int = 0,
+        notification_sent: bool = False,
+        last_notification: str | None = None,
     ):
         self.result = result
         self.previous_status = previous_status
         self.failure_count = failure_count
+        self.consecutive_failures = consecutive_failures
+        self.notification_sent = notification_sent
+        self.last_notification = last_notification
         self.is_state_change = (
             previous_status != result.status if previous_status else True
         )
@@ -64,13 +70,24 @@ class BaseNotifier(ABC):
 
         events = self.config.events
 
-        # Check if we should notify based on configured events
-        if NotificationEvent.BOTH in events:
+        # Check if this is a recovery - always notify for recovery
+        if context.is_recovery and (
+            NotificationEvent.RECOVERY in events or NotificationEvent.BOTH in events
+        ):
             return True
-        elif NotificationEvent.FAILURE in events and context.is_failure:
-            return True
-        elif NotificationEvent.RECOVERY in events and context.is_recovery:
-            return True
+
+        # Check if this is a failure
+        if context.is_failure and (
+            NotificationEvent.FAILURE in events or NotificationEvent.BOTH in events
+        ):
+            # Check failure threshold - only notify if consecutive failures >= threshold
+            if context.consecutive_failures >= self.config.failure_threshold:
+                # Check if we should suppress repeated notifications
+                if self.config.suppress_repeated and context.notification_sent:
+                    # Don't send repeated failure notifications
+                    return False
+                # Send notification for first failure at threshold or if suppress_repeated is False
+                return True
 
         return False
 
@@ -261,6 +278,7 @@ class WebhookNotifier(BaseNotifier):
             "is_recovery": context.is_recovery,
             "is_failure": context.is_failure,
             "failure_count": context.failure_count,
+            "consecutive_failures": context.consecutive_failures,
         }
 
         if result.response_time is not None:
@@ -278,8 +296,9 @@ class WebhookNotifier(BaseNotifier):
 class NotificationManager:
     """Manages all notification sending."""
 
-    def __init__(self) -> None:
+    def __init__(self, db_manager: Any = None) -> None:
         self.notifiers: list[BaseNotifier] = []
+        self.db_manager = db_manager
 
     def add_notifier(self, notifier: BaseNotifier) -> None:
         """Add a notifier to the manager."""
@@ -300,6 +319,8 @@ class NotificationManager:
                 "No notifications to send",
                 endpoint=context.result.endpoint_name,
                 status=context.result.status,
+                consecutive_failures=context.consecutive_failures,
+                notification_sent=context.notification_sent,
             )
             return
 
@@ -308,9 +329,17 @@ class NotificationManager:
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Log results
+        # Check if any notifications were successfully sent
         successful = sum(1 for result in results if result is True)
         failed = len(results) - successful
+
+        # Update notification status in database if we have a db_manager and sent notifications
+        if self.db_manager and successful > 0:
+            # Only mark as sent for failure notifications, not recovery
+            if context.is_failure:
+                await self.db_manager.update_notification_status(
+                    context.result.endpoint_name, notification_sent=True
+                )
 
         logger.info(
             "Notifications sent",
@@ -319,6 +348,7 @@ class NotificationManager:
             successful=successful,
             failed=failed,
             total=len(active_notifiers),
+            consecutive_failures=context.consecutive_failures,
         )
 
 
@@ -327,13 +357,30 @@ def create_notification_manager(
     global_webhook_config: WebhookNotificationConfig | None = None,
     endpoint_email_config: EmailNotificationConfig | None = None,
     endpoint_webhook_config: WebhookNotificationConfig | None = None,
+    db_manager: Any = None,
 ) -> NotificationManager:
     """Create notification manager with configured notifiers."""
-    manager = NotificationManager()
+    manager = NotificationManager(db_manager=db_manager)
 
-    # Use endpoint-specific config if available, otherwise use global config
-    email_config = endpoint_email_config or global_email_config
-    webhook_config = endpoint_webhook_config or global_webhook_config
+    # Handle email configuration with inheritance
+    email_config = None
+    if endpoint_email_config:
+        # Merge endpoint config with global config
+        email_config = endpoint_email_config.merge_with_global(global_email_config)
+    elif global_email_config:
+        # Use global config directly
+        email_config = global_email_config
+
+    # Handle webhook configuration with inheritance
+    webhook_config = None
+    if endpoint_webhook_config:
+        # Merge endpoint config with global config
+        webhook_config = endpoint_webhook_config.merge_with_global(
+            global_webhook_config
+        )
+    elif global_webhook_config:
+        # Use global config directly
+        webhook_config = global_webhook_config
 
     if email_config and email_config.enabled:
         manager.add_notifier(EmailNotifier(email_config))

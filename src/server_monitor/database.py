@@ -134,6 +134,9 @@ class DatabaseManager:
             last_success TIMESTAMP WITH TIME ZONE,
             last_failure TIMESTAMP WITH TIME ZONE,
             failure_count INTEGER DEFAULT 0,
+            consecutive_failures INTEGER DEFAULT 0,
+            last_notification TIMESTAMP WITH TIME ZONE,
+            notification_sent BOOLEAN DEFAULT FALSE,
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
         """
@@ -178,6 +181,9 @@ class DatabaseManager:
             last_success TEXT,
             last_failure TEXT,
             failure_count INTEGER DEFAULT 0,
+            consecutive_failures INTEGER DEFAULT 0,
+            last_notification TEXT,
+            notification_sent INTEGER DEFAULT 0,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
         """
@@ -301,17 +307,49 @@ class DatabaseManager:
 
     async def _update_postgresql_endpoint_status(self, result: CheckResult) -> None:
         """Update endpoint status in PostgreSQL."""
+        # First get current status to calculate consecutive failures
+        current_status = await self._get_postgresql_endpoint_status(
+            result.endpoint_name
+        )
+
+        consecutive_failures = 0
+        notification_sent = False
+        last_notification = None
+
+        if result.status != CheckStatus.SUCCESS:
+            # It's a failure
+            if current_status and current_status["current_status"] != "success":
+                # Previous status was also failure, increment consecutive count
+                consecutive_failures = current_status.get("consecutive_failures", 0) + 1
+                notification_sent = current_status.get("notification_sent", False)
+                last_notification = current_status.get("last_notification")
+            else:
+                # First failure in sequence
+                consecutive_failures = 1
+                notification_sent = False
+                last_notification = None
+        else:
+            # It's a success, reset consecutive failures and notification state
+            consecutive_failures = 0
+            notification_sent = False
+            last_notification = None
+
         upsert_sql = """
         INSERT INTO endpoint_status (
-            endpoint_name, current_status, last_success, last_failure, failure_count, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6)
+            endpoint_name, current_status, last_success, last_failure, failure_count,
+            consecutive_failures, last_notification, notification_sent, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         ON CONFLICT (endpoint_name) DO UPDATE SET
             current_status = EXCLUDED.current_status,
             last_success = EXCLUDED.last_success,
             last_failure = EXCLUDED.last_failure,
             failure_count = EXCLUDED.failure_count,
+            consecutive_failures = EXCLUDED.consecutive_failures,
+            last_notification = EXCLUDED.last_notification,
+            notification_sent = EXCLUDED.notification_sent,
             updated_at = EXCLUDED.updated_at
         """
+
         last_success = (
             result.timestamp if result.status == CheckStatus.SUCCESS else None
         )
@@ -319,6 +357,7 @@ class DatabaseManager:
             result.timestamp if result.status != CheckStatus.SUCCESS else None
         )
         failure_count = 0 if result.status == CheckStatus.SUCCESS else 1
+
         if self.config.type == DatabaseType.POSTGRESQL:
             async with self._pool.acquire() as conn:  # type: ignore
                 await conn.execute(
@@ -328,6 +367,9 @@ class DatabaseManager:
                     last_success,
                     last_failure,
                     failure_count,
+                    consecutive_failures,
+                    last_notification,
+                    notification_sent,
                     datetime.now(),
                 )
         else:
@@ -342,11 +384,36 @@ class DatabaseManager:
             else ""
         )
 
+        # First get current status to calculate consecutive failures
+        current_status = await self._get_sqlite_endpoint_status(result.endpoint_name)
+
+        consecutive_failures = 0
+        notification_sent = 0
+        last_notification = None
+
+        if result.status != CheckStatus.SUCCESS:
+            # It's a failure
+            if current_status and current_status["current_status"] != "success":
+                # Previous status was also failure, increment consecutive count
+                consecutive_failures = current_status.get("consecutive_failures", 0) + 1
+                notification_sent = current_status.get("notification_sent", 0)
+                last_notification = current_status.get("last_notification")
+            else:
+                # First failure in sequence
+                consecutive_failures = 1
+                notification_sent = 0
+                last_notification = None
+        else:
+            # It's a success, reset consecutive failures and notification state
+            consecutive_failures = 0
+            notification_sent = 0
+            last_notification = None
+
         # SQLite doesn't have native UPSERT like PostgreSQL, so we'll use INSERT OR REPLACE
         upsert_sql = """
         INSERT OR REPLACE INTO endpoint_status (
             endpoint_name, current_status, last_success, last_failure,
-            failure_count, updated_at
+            failure_count, consecutive_failures, last_notification, notification_sent, updated_at
         )
         VALUES (
             ?, ?,
@@ -356,7 +423,7 @@ class DatabaseManager:
                 (SELECT last_failure FROM endpoint_status WHERE endpoint_name = ?) END,
             CASE WHEN ? = 'success' THEN 0 ELSE
                 COALESCE((SELECT failure_count FROM endpoint_status WHERE endpoint_name = ?), 0) + 1 END,
-            ?
+            ?, ?, ?, ?
         )
         """
 
@@ -379,6 +446,9 @@ class DatabaseManager:
                     result.endpoint_name,
                     result.status.value,
                     result.endpoint_name,
+                    consecutive_failures,
+                    last_notification,
+                    notification_sent,
                     datetime.now().isoformat(),
                 ),
             )
@@ -398,6 +468,9 @@ class DatabaseManager:
                         result.endpoint_name,
                         result.status.value,
                         result.endpoint_name,
+                        consecutive_failures,
+                        last_notification,
+                        notification_sent,
                         datetime.now().isoformat(),
                     ),
                 )
@@ -417,7 +490,7 @@ class DatabaseManager:
         """Get endpoint status from PostgreSQL."""
         select_sql = """
         SELECT endpoint_name, current_status, last_success, last_failure,
-               failure_count, updated_at
+               failure_count, consecutive_failures, last_notification, notification_sent, updated_at
         FROM endpoint_status
         WHERE endpoint_name = $1
         """
@@ -443,7 +516,7 @@ class DatabaseManager:
 
         select_sql = """
         SELECT endpoint_name, current_status, last_success, last_failure,
-               failure_count, updated_at
+               failure_count, consecutive_failures, last_notification, notification_sent, updated_at
         FROM endpoint_status
         WHERE endpoint_name = ?
         """
@@ -468,6 +541,91 @@ class DatabaseManager:
                     if row:
                         return dict(row)
                     return None
+
+    async def update_notification_status(
+        self,
+        endpoint_name: str,
+        notification_sent: bool,
+        notification_time: datetime | None = None,
+    ) -> None:
+        """Update notification status for an endpoint."""
+        if notification_time is None:
+            notification_time = datetime.now()
+
+        if self.config.type == DatabaseType.POSTGRESQL:
+            await self._update_postgresql_notification_status(
+                endpoint_name, notification_sent, notification_time
+            )
+        elif self.config.type == DatabaseType.SQLITE:
+            await self._update_sqlite_notification_status(
+                endpoint_name, notification_sent, notification_time
+            )
+
+    async def _update_postgresql_notification_status(
+        self, endpoint_name: str, notification_sent: bool, notification_time: datetime
+    ) -> None:
+        """Update notification status in PostgreSQL."""
+        update_sql = """
+        UPDATE endpoint_status
+        SET notification_sent = $1, last_notification = $2, updated_at = $3
+        WHERE endpoint_name = $4
+        """
+
+        async with self._pool.acquire() as conn:  # type: ignore
+            await conn.execute(
+                update_sql,
+                notification_sent,
+                notification_time,
+                datetime.now(),
+                endpoint_name,
+            )
+
+    async def _update_sqlite_notification_status(
+        self, endpoint_name: str, notification_sent: bool, notification_time: datetime
+    ) -> None:
+        """Update notification status in SQLite."""
+        database_path = (
+            self.config.url.replace("sqlite:///", "")
+            if self.config.url is not None
+            else ""
+        )
+
+        update_sql = """
+        UPDATE endpoint_status
+        SET notification_sent = ?, last_notification = ?, updated_at = ?
+        WHERE endpoint_name = ?
+        """
+
+        notification_sent_int = 1 if notification_sent else 0
+
+        # Use existing connection for in-memory databases, create new one for file databases
+        if (
+            database_path == ":memory:"
+            and self._pool
+            and isinstance(self._pool, aiosqlite.Connection)
+        ):
+            await self._pool.execute(
+                update_sql,
+                (
+                    notification_sent_int,
+                    notification_time.isoformat(),
+                    datetime.now().isoformat(),
+                    endpoint_name,
+                ),
+            )
+            await self._pool.commit()
+        else:
+            async with aiosqlite.connect(database_path) as conn:
+                await conn.execute(
+                    update_sql,
+                    (
+                        notification_sent_int,
+                        notification_time.isoformat(),
+                        datetime.now().isoformat(),
+                        endpoint_name,
+                    ),
+                )
+                await conn.commit()
 
     async def close(self) -> None:
         """Close database connections."""

@@ -135,6 +135,153 @@ endpoints:
   # More endpoints...
 ```
 
+## Enhanced Notification Features
+
+The monitoring system includes advanced notification features to reduce alert fatigue and ensure you're only notified when necessary:
+
+### Failure Threshold
+- **`failure_threshold`**: Set the number of consecutive failures required before sending an alert
+- Default: `1` (alert on first failure)
+- Example: Set to `3` to only alert after 3 consecutive check failures
+
+### Repeated Alert Suppression
+- **`suppress_repeated`**: Prevent repeated notifications for the same ongoing failure
+- Default: `true`
+- When enabled, only the first notification is sent when the threshold is reached
+- Recovery notifications are always sent regardless of this setting
+
+### Notification Behavior
+1. **First failure**: Endpoint goes down → Count consecutive failures
+2. **Threshold reached**: Send notification after X consecutive failures
+3. **Ongoing failure**: Suppress further notifications (if `suppress_repeated: true`)
+4. **Recovery**: Always send recovery notification and reset failure count
+5. **Future failures**: Start counting from 1 again
+
+### Example Configuration
+
+```yaml
+global:
+  email_notifications:
+    enabled: true
+    events: [both]
+    failure_threshold: 3      # Alert after 3 consecutive failures
+    suppress_repeated: true   # Don't repeat alerts for same failure
+    # ... smtp configuration
+
+  webhook_notifications:
+    enabled: true
+    events: [failure]
+    failure_threshold: 2      # Alert after 2 consecutive failures
+    suppress_repeated: true   # Don't repeat alerts for same failure
+    # ... webhook configuration
+```
+
+This configuration will:
+- Send email alerts after 3 consecutive failures
+- Send webhook alerts after 2 consecutive failures
+- Not send repeated failure notifications
+- Always send recovery notifications
+
+## Endpoint-Specific Notification Overrides
+
+You can override notification settings for individual endpoints while inheriting global SMTP/webhook configurations. This allows you to:
+
+- Send critical alerts to different recipients
+- Use different failure thresholds per endpoint
+- Customize notification behavior for specific services
+- Maintain a single global SMTP configuration
+
+### Inheritance Behavior
+
+Endpoint configurations **inherit** from global settings and only override the fields you specify:
+
+- **SMTP settings** are always inherited from global configuration
+- **Recipients, thresholds, and behavior** can be overridden per endpoint
+- **Missing fields** automatically use global defaults
+
+### Email Override Examples
+
+```yaml
+global:
+  email_notifications:
+    enabled: true
+    smtp:
+      host: smtp.example.com
+      # ... complete SMTP configuration
+    recipients: ["team@example.com"]
+    failure_threshold: 3
+    events: [both]
+
+endpoints:
+  - name: Critical API
+    type: http
+    # ... endpoint configuration
+    email_notifications:
+      enabled: true
+      recipients: ["oncall@example.com", "cto@example.com"]  # Override recipients
+      failure_threshold: 1                                   # Alert immediately
+      # Inherits: smtp, events, suppress_repeated, subject_template
+
+  - name: Background Service
+    type: http
+    # ... endpoint configuration
+    email_notifications:
+      enabled: true
+      events: [failure]                    # Only notify on failures
+      suppress_repeated: false             # Allow repeated notifications
+      subject_template: "🔧 Service Issue: {endpoint_name}"
+      # Inherits: smtp, recipients, failure_threshold
+
+  - name: Development Environment
+    type: http
+    # ... endpoint configuration
+    email_notifications:
+      enabled: false  # Disable notifications for this endpoint
+```
+
+### Webhook Override Examples
+
+```yaml
+global:
+  webhook_notifications:
+    enabled: true
+    webhook:
+      url: https://hooks.slack.com/services/team/general
+      # ... webhook configuration
+    events: [both]
+    failure_threshold: 2
+
+endpoints:
+  - name: Production API
+    type: http
+    # ... endpoint configuration
+    webhook_notifications:
+      enabled: true
+      webhook:
+        url: https://hooks.slack.com/services/team/alerts  # Different Slack channel
+        headers:
+          Content-Type: application/json
+          X-Priority: high
+      failure_threshold: 1                                 # Alert immediately
+      # Inherits: method, timeout, events, suppress_repeated
+
+  - name: Monitoring Endpoint
+    type: http
+    # ... endpoint configuration
+    webhook_notifications:
+      enabled: true
+      events: [recovery]           # Only notify on recovery
+      failure_threshold: 5         # Less sensitive
+      # Inherits: webhook configuration, suppress_repeated
+```
+
+### Validation Rules
+
+- **Global configurations** must be complete (include all required fields like SMTP settings and recipients)
+- **Endpoint overrides** can be partial and will inherit missing fields from global configuration
+- **At least one notification method** (global email or webhook) must be configured if endpoint overrides are used
+- **Endpoint overrides without global configuration** will fail validation
+
 ## Environment Variables
 
 To securely store sensitive information, set the following environment variables:
