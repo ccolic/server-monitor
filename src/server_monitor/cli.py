@@ -276,16 +276,6 @@ def generate_config(output: str) -> None:
 
 
 @cli.command()
-def health() -> None:
-    """Health check endpoint for Docker container monitoring."""
-    try:
-        click.echo("OK")
-    except Exception as e:
-        click.echo(f"Error: {str(e)}", err=True)
-        sys.exit(1)
-
-
-@cli.command()
 @click.argument("config_path", type=click.Path(exists=True))
 def validate(config_path: str) -> None:
     """Validate configuration file."""
